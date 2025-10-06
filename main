@@ -1,6 +1,7 @@
 -- ===================================================================
 -- ## AKB Combined UI - (Fantasy TP + Item Loop) - AFK System Update ##
 -- ##           Merged by Gemini for AKB Akibus Shop               ##
+-- ##                 -- Sell Grass Button Added --                 ##
 -- ===================================================================
 
 -- Services
@@ -17,7 +18,7 @@ local NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net
 
 -- Clean up old UI if it exists
 pcall(function()
-    PlayerGui:FindFirstChild("AKB_CombinedUI"):Destroy()
+    PlayerGui:FindFirstChild("AKB_CombinedUI"):Destroy()
 end)
 
 -- ================== Main ScreenGui ==================
@@ -90,7 +91,7 @@ loopMainFrame.Parent = screenGui
 loopMainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 loopMainFrame.BorderSizePixel = 2
 loopMainFrame.Position = UDim2.new(0.5, 135, 0.5, -230)
-loopMainFrame.Size = UDim2.new(0, 360, 0, 245)
+loopMainFrame.Size = UDim2.new(0, 360, 0, 290) -- ## NEW ## | Increased height for new button
 loopMainFrame.Draggable = true
 loopMainFrame.Active = true
 
@@ -156,6 +157,19 @@ loopTeleportButton.Text = "เก็บของเลเบลแดง"
 loopTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopTeleportButton.TextSize = 16
 
+-- ## NEW ## | Create the new Sell Grass button
+local sellGrassButton = Instance.new("TextButton")
+sellGrassButton.Name = "SellGrassButton"
+sellGrassButton.Parent = loopMainFrame
+sellGrassButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80) -- Green color for selling
+sellGrassButton.Position = UDim2.new(0.05, 0, 0, 235) -- Position below the teleport button
+sellGrassButton.Size = UDim2.new(0.9, 0, 0, 40)
+sellGrassButton.Font = Enum.Font.SourceSansBold
+sellGrassButton.Text = "ขายหญ้า (เริ่ม)"
+sellGrassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+sellGrassButton.TextSize = 16
+
+
 -- ###################################################################
 -- ## SECTION 3: CORE VARIABLES & FUNCTIONS (รวมจากสองสคริปต์)
 -- ###################################################################
@@ -175,12 +189,16 @@ local lastPlayerPosition = Vector3.new() -- Unified position tracker for all tim
 
 -- == Variables for Item Loop UI ==
 local itemSettings = {
-    Rock = { Name = "Rock", DisplayName = "แร่", Quantity = 100, ThemeColor = Color3.fromRGB(127, 100, 85), HeaderColor = Color3.fromRGB(70, 60, 50) },
-    Grass = { Name = "Grassbush", DisplayName = "หญ้า", Quantity = 80, ThemeColor = Color3.fromRGB(78, 142, 83), HeaderColor = Color3.fromRGB(50, 90, 53) }
+    Rock = { Name = "Rock", DisplayName = "แร่", Quantity = 100, ThemeColor = Color3.fromRGB(127, 100, 85), HeaderColor = Color3.fromRGB(70, 60, 50) },
+    Grass = { Name = "Grassbush", DisplayName = "หญ้า", Quantity = 80, ThemeColor = Color3.fromRGB(78, 142, 83), HeaderColor = Color3.fromRGB(50, 90, 53) }
 }
 local currentSelection = itemSettings.Rock
 local isLooping = false
 local loopThread = nil
+
+-- ## NEW ## | Variables for the Sell Grass Loop
+local isSellingGrass = false
+local sellGrassThread = nil
 
 -- ================== Core Functions ==================
 local executeAfkSequence -- Forward declaration
@@ -201,112 +219,144 @@ local function teleportToOreMining() local c=LocalPlayer.Character;if not c then
 
 -- == Functions for Item Loop UI ==
 local function updateUIForSelection()
-    loopTitleLabel.Text = "AKB Loop | " .. currentSelection.DisplayName
-    loopTitleLabel.BackgroundColor3 = currentSelection.HeaderColor
-    loopMainFrame.BorderColor3 = currentSelection.ThemeColor
-    if currentSelection == itemSettings.Rock then
-        loopRockButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
-        loopGrassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    else
-        loopRockButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        loopGrassButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
-    end
+    loopTitleLabel.Text = "AKB Loop | " .. currentSelection.DisplayName
+    loopTitleLabel.BackgroundColor3 = currentSelection.HeaderColor
+    loopMainFrame.BorderColor3 = currentSelection.ThemeColor
+    if currentSelection == itemSettings.Rock then
+        loopRockButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+        loopGrassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    else
+        loopRockButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        loopGrassButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+    end
 end
 local function teleportToRedLabelStorage()
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        character.HumanoidRootPart.CFrame = CFrame.new(-3893, 77, -602)
-    else
-        warn("ไม่พบตัวละครหรือ HumanoidRootPart!")
-    end
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(-3893, 77, -602)
+    else
+        warn("ไม่พบตัวละครหรือ HumanoidRootPart!")
+    end
 end
 local function stopLoop()
-    isLooping = false
-    loopThread = nil
-    loopStatusLabel.Text = "สถานะ: หยุดทำงาน"
-    loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    isLooping = false
+    loopThread = nil
+    loopStatusLabel.Text = "สถานะ: หยุดทำงาน"
+    loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
 end
 local function startForwardLoop()
-    if isLooping then return end
-    isLooping = true
-    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ไปข้างหน้า) | " .. currentSelection.DisplayName
-    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
-    loopThread = coroutine.create(function()
-        while isLooping do
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Safe"), currentSelection.Name, currentSelection.Quantity) end)
-            task.wait(0.5)
-            if not isLooping then break end
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Locker"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
-            task.wait(0.5)
-        end
-    end)
-    coroutine.resume(loopThread)
+    if isLooping then return end
+    isLooping = true
+    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ไปข้างหน้า) | " .. currentSelection.DisplayName
+    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+    loopThread = coroutine.create(function()
+        while isLooping do
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Safe"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+            if not isLooping then break end
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Locker"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+        end
+    end)
+    coroutine.resume(loopThread)
 end
 
 function executeAfkSequence()
-    if isAfkSequenceActive then return end
-    isAfkSequenceActive = true
-    
-    -- 1. Store current state
-    local wasFarmingGrass = isGrassFarmEnabled
-    local wasFarmingOre = isOreFarmEnabled
-    local character = LocalPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    local lastPositionBeforeAfk = rootPart and rootPart.Position
+    if isAfkSequenceActive then return end
+    isAfkSequenceActive = true
+    
+    -- 1. Store current state
+    local wasFarmingGrass = isGrassFarmEnabled
+    local wasFarmingOre = isOreFarmEnabled
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local lastPositionBeforeAfk = rootPart and rootPart.Position
 
-    if not lastPositionBeforeAfk then
-        warn("AFK Sequence cancelled: Could not get player position.")
-        isAfkSequenceActive = false
-        return
-    end
+    if not lastPositionBeforeAfk then
+        warn("AFK Sequence cancelled: Could not get player position.")
+        isAfkSequenceActive = false
+        return
+    end
 
-    -- 2. Stop farming and teleport to storage
-    stopAllFarms()
-    teleportToRedLabelStorage()
-    task.wait(1) -- Allow time for teleport to complete
+    -- 2. Stop farming and teleport to storage
+    stopAllFarms()
+    teleportToRedLabelStorage()
+    task.wait(1) -- Allow time for teleport to complete
 
-    -- 3. Run item loop for 10 seconds
-    startForwardLoop()
-    task.wait(10)
-    stopLoop()
-    task.wait(0.5) -- Allow time for loop to stop sending events
+    -- 3. Run item loop for 10 seconds
+    startForwardLoop()
+    task.wait(10)
+    stopLoop()
+    task.wait(0.5) -- Allow time for loop to stop sending events
 
-    -- 4. Teleport back to the original farming spot
-    if character then
-        character:PivotTo(CFrame.new(lastPositionBeforeAfk))
-    end
-    task.wait(1) -- Allow time for teleport
+    -- 4. Teleport back to the original farming spot
+    if character then
+        character:PivotTo(CFrame.new(lastPositionBeforeAfk))
+    end
+    task.wait(1) -- Allow time for teleport
 
-    -- 5. Resume the farm that was active
-    if wasFarmingGrass then
-        isGrassFarmEnabled = true
-        grassFarmButton.Text = "หยุดฟามหญ้า"
-        grassFarmButton.BackgroundColor3 = fantasyColors.StopRed
-    elseif wasFarmingOre then
-        isOreFarmEnabled = true
-        oreFarmButton.Text = "หยุดฟามแร่"
-        oreFarmButton.BackgroundColor3 = fantasyColors.StopRed
-    end
+    -- 5. Resume the farm that was active
+    if wasFarmingGrass then
+        isGrassFarmEnabled = true
+        grassFarmButton.Text = "หยุดฟามหญ้า"
+        grassFarmButton.BackgroundColor3 = fantasyColors.StopRed
+    elseif wasFarmingOre then
+        isOreFarmEnabled = true
+        oreFarmButton.Text = "หยุดฟามแร่"
+        oreFarmButton.BackgroundColor3 = fantasyColors.StopRed
+    end
 
-    -- 6. Reset the AFK state
-    isAfkSequenceActive = false
+    -- 6. Reset the AFK state
+    isAfkSequenceActive = false
 end
 
 local function startReverseLoop()
-    if isLooping then return end
-    isLooping = true
-    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ย้อนกลับ) | " .. currentSelection.DisplayName
-    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 191, 255)
-    loopThread = coroutine.create(function()
-        while isLooping do
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Locker"), currentSelection.Name, currentSelection.Quantity) end)
-            task.wait(0.5)
-            if not isLooping then break end
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Safe"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
-            task.wait(0.5)
-        end
-    end)
-    coroutine.resume(loopThread)
+    if isLooping then return end
+    isLooping = true
+    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ย้อนกลับ) | " .. currentSelection.DisplayName
+    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 191, 255)
+    loopThread = coroutine.create(function()
+        while isLooping do
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Locker"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+            if not isLooping then break end
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Safe"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+        end
+    end)
+    coroutine.resume(loopThread)
+end
+
+-- ## NEW ## | Function to toggle the grass selling loop
+local function toggleSellGrassLoop()
+    if isSellingGrass then
+        -- Stop the loop
+        isSellingGrass = false
+        sellGrassThread = nil
+        sellGrassButton.Text = "ขายหญ้า (เริ่ม)"
+        sellGrassButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80) -- Back to green
+        loopStatusLabel.Text = "สถานะ: หยุดทำงาน"
+        loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    else
+        -- Start the loop
+        if isLooping then stopLoop() end -- Stop other loops if they are running
+        
+        isSellingGrass = true
+        sellGrassButton.Text = "ขายหญ้า (หยุด)"
+        sellGrassButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40) -- Red for stop
+        loopStatusLabel.Text = "สถานะ: กำลังขายหญ้า..."
+        loopStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+
+        sellGrassThread = coroutine.create(function()
+            while isSellingGrass do
+                pcall(function()
+                    NetworkEvent:FireServer("fire", nil, "Economy", "Grassbush", 80)
+                end)
+                task.wait(0.1)
+            end
+        end)
+        coroutine.resume(sellGrassThread)
+    end
 end
 
 -- ###################################################################
@@ -335,59 +385,63 @@ loopReverseButton.MouseButton1Click:Connect(startReverseLoop)
 loopStopButton.MouseButton1Click:Connect(stopLoop)
 loopTeleportButton.MouseButton1Click:Connect(teleportToRedLabelStorage)
 
+-- ## NEW ## | Connection for the new Sell Grass Button
+sellGrassButton.MouseButton1Click:Connect(toggleSellGrassLoop)
+
+
 -- == System Connections ==
 locListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()locationsFrame.CanvasSize=UDim2.fromOffset(0,locListLayout.AbsoluteContentSize.Y)end)
 RunService.Heartbeat:Connect(function(dt)
-    -- Update Coords Display
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        myCoordsLabel.Text = string.format("Coords: %.0f, %.0f, %.0f", LocalPlayer.Character.HumanoidRootPart.Position.X, LocalPlayer.Character.HumanoidRootPart.Position.Y, LocalPlayer.Character.HumanoidRootPart.Position.Z)
-    else
-        myCoordsLabel.Text = "Coords: N/A"
-    end
+    -- Update Coords Display
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        myCoordsLabel.Text = string.format("Coords: %.0f, %.0f, %.0f", LocalPlayer.Character.HumanoidRootPart.Position.X, LocalPlayer.Character.HumanoidRootPart.Position.Y, LocalPlayer.Character.HumanoidRootPart.Position.Z)
+    else
+        myCoordsLabel.Text = "Coords: N/A"
+    end
 
-    -- Get character and root part once
-    local char = LocalPlayer.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    -- Get character and root part once
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-    -- Check if player is standing still
-    local isStandingStill = (root.Position - lastPlayerPosition).Magnitude < 0.1
+    -- Check if player is standing still
+    local isStandingStill = (root.Position - lastPlayerPosition).Magnitude < 0.1
 
-    -- Handle standard farm idle timers (for moving between points)
-    if isGrassFarmEnabled then
-        if isStandingStill then grassFarmIdleTimer += dt else grassFarmIdleTimer = 0 end
-        if grassFarmIdleTimer >= IDLE_TIME and not isGrassFarmMoving then
-            performGrassFarmActions(char)
-            grassFarmIdleTimer = 0
-        end
-    end
-    if isOreFarmEnabled then
-        if isStandingStill then oreFarmIdleTimer += dt else oreFarmIdleTimer = 0 end
-        if oreFarmIdleTimer >= IDLE_TIME and not isOreFarmMoving then
-            performOreFarmActions(char)
-            oreFarmIdleTimer = 0
-        end
-    end
+    -- Handle standard farm idle timers (for moving between points)
+    if isGrassFarmEnabled then
+        if isStandingStill then grassFarmIdleTimer += dt else grassFarmIdleTimer = 0 end
+        if grassFarmIdleTimer >= IDLE_TIME and not isGrassFarmMoving then
+            performGrassFarmActions(char)
+            grassFarmIdleTimer = 0
+        end
+    end
+    if isOreFarmEnabled then
+        if isStandingStill then oreFarmIdleTimer += dt else oreFarmIdleTimer = 0 end
+        if oreFarmIdleTimer >= IDLE_TIME and not isOreFarmMoving then
+            performOreFarmActions(char)
+            oreFarmIdleTimer = 0
+        end
+    end
 
-    -- Handle the main AFK sequence timer (for getting stuck)
-    if (isGrassFarmEnabled or isOreFarmEnabled) and not isAfkSequenceActive then
-        if isStandingStill then
-            afkTimer = afkTimer + dt
-        else
-            afkTimer = 0
-        end
+    -- Handle the main AFK sequence timer (for getting stuck)
+    if (isGrassFarmEnabled or isOreFarmEnabled) and not isAfkSequenceActive then
+        if isStandingStill then
+            afkTimer = afkTimer + dt
+        else
+            afkTimer = 0
+        end
 
-        if afkTimer >= AFK_TIMER_DURATION then
-            afkTimer = 0 -- Reset immediately
-            task.spawn(executeAfkSequence) -- Run in a new thread to not interrupt the game
-        end
-    else
-        afkTimer = 0 -- Reset if not farming or sequence is already active
-    end
-    
-    -- Update last position for the next frame's check
-    lastPlayerPosition = root.Position
+        if afkTimer >= AFK_TIMER_DURATION then
+            afkTimer = 0 -- Reset immediately
+            task.spawn(executeAfkSequence) -- Run in a new thread to not interrupt the game
+        end
+    else
+        afkTimer = 0 -- Reset if not farming or sequence is already active
+    end
+    
+    -- Update last position for the next frame's check
+    lastPlayerPosition = root.Position
 end)
 
 
@@ -395,4 +449,4 @@ end)
 -- ## SECTION 5: INITIALIZATION
 -- ###################################################################
 updateUIForSelection() -- ตั้งค่า UI เริ่มต้นสำหรับหน้าต่างวนลูป
-print("AKB Combined UI (Fantasy TP + Item Loop) with AFK System Loaded Successfully.")
+print("AKB Combined UI (Fantasy TP + Item Loop) with AFK System & Sell Button Loaded Successfully.")
