@@ -1,0 +1,398 @@
+-- ===================================================================
+-- ## AKB Combined UI - (Fantasy TP + Item Loop) - AFK System Update ##
+-- ##           Merged by Gemini for AKB Akibus Shop               ##
+-- ===================================================================
+
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Local Player & GUI & Network
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("NetworkFramework"):WaitForChild("NetworkEvent")
+
+-- Clean up old UI if it exists
+pcall(function()
+    PlayerGui:FindFirstChild("AKB_CombinedUI"):Destroy()
+end)
+
+-- ================== Main ScreenGui ==================
+local screenGui = Instance.new("ScreenGui");
+screenGui.Name = "AKB_CombinedUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = PlayerGui
+
+-- ###################################################################
+-- ## SECTION 1: FANTASY TELEPORT & FARM UI (UI ด้านซ้าย)
+-- ###################################################################
+
+-- ================== UI Creation (Fantasy) ==================
+local fantasyColors = { Background=Color3.fromRGB(25,20,40), Primary=Color3.fromRGB(45,35,70), Secondary=Color3.fromRGB(0,150,160), Highlight=Color3.fromRGB(255,220,100), Text=Color3.fromRGB(240,230,255), TextGold=Color3.fromRGB(255,235,170), ActiveGreen=Color3.fromRGB(0,170,81), StopRed=Color3.fromRGB(200,40,40) }
+
+local mainFrame = Instance.new("Frame"); mainFrame.Name = "MainFrame"; mainFrame.Size = UDim2.new(0,250,0,460); mainFrame.Position = UDim2.new(0.5,-125,0.5,-230); mainFrame.BackgroundColor3 = fantasyColors.Background; mainFrame.BorderSizePixel = 0; mainFrame.ClipsDescendants = true; mainFrame.Active = true; mainFrame.Draggable = true; mainFrame.Parent = screenGui
+local uiCorner = Instance.new("UICorner"); uiCorner.CornerRadius = UDim.new(0,8); uiCorner.Parent = mainFrame
+local mainStroke = Instance.new("UIStroke"); mainStroke.Color = fantasyColors.Highlight; mainStroke.Thickness = 1; mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; mainStroke.Parent = mainFrame
+local titleBar = Instance.new("Frame"); titleBar.Name = "TitleBar"; titleBar.Size = UDim2.new(1,0,0,30); titleBar.BackgroundColor3 = fantasyColors.Primary; titleBar.BorderSizePixel = 0; titleBar.Parent = mainFrame
+local titleCorner = Instance.new("UICorner"); titleCorner.CornerRadius = UDim.new(0,8); titleCorner.Parent = titleBar
+local titleLabel = Instance.new("TextLabel"); titleLabel.Name = "TitleLabel"; titleLabel.Size = UDim2.new(1,-40,1,0); titleLabel.Position = UDim2.new(0,10,0,0); titleLabel.BackgroundTransparency = 1; titleLabel.Font = Enum.Font.Garamond; titleLabel.Text = "AKB"; titleLabel.TextColor3 = fantasyColors.TextGold; titleLabel.TextSize = 22; titleLabel.TextXAlignment = Enum.TextXAlignment.Left; titleLabel.Parent = titleBar
+local toggleButton = Instance.new("TextButton"); toggleButton.Name = "ToggleButton"; toggleButton.Size = UDim2.new(0,20,0,20); toggleButton.Position = UDim2.new(1,-25,0.5,-10); toggleButton.BackgroundColor3 = fantasyColors.Background; toggleButton.Font = Enum.Font.SourceSansBold; toggleButton.Text = "–"; toggleButton.TextColor3 = fantasyColors.Highlight; toggleButton.TextSize = 18; toggleButton.Parent = titleBar
+local toggleCorner = Instance.new("UICorner"); toggleCorner.CornerRadius = UDim.new(0,4); toggleCorner.Parent = toggleButton
+local myCoordsFrame = Instance.new("Frame"); myCoordsFrame.Name = "MyCoordsFrame"; myCoordsFrame.Size = UDim2.new(1,-10,0,25); myCoordsFrame.Position = UDim2.new(0,5,0,35); myCoordsFrame.BackgroundTransparency = 1; myCoordsFrame.Parent = mainFrame
+local myCoordsLabel = Instance.new("TextLabel",myCoordsFrame); myCoordsLabel.Name = "MyCoordsLabel"; myCoordsLabel.Size = UDim2.new(1,-70,1,0); myCoordsLabel.Position = UDim2.new(0,0,0,0); myCoordsLabel.BackgroundColor3 = fantasyColors.Primary; myCoordsLabel.Font = Enum.Font.Garamond; myCoordsLabel.Text = "My Coords: ..."; myCoordsLabel.TextColor3 = fantasyColors.Text; myCoordsLabel.TextSize = 16; myCoordsLabel.TextXAlignment = Enum.TextXAlignment.Center
+local myCoordsLabelCorner = Instance.new("UICorner",myCoordsLabel); myCoordsLabelCorner.CornerRadius = UDim.new(0,4)
+local myCoordsStroke = Instance.new("UIStroke",myCoordsLabel); myCoordsStroke.Color = fantasyColors.Highlight; myCoordsStroke.Thickness = 0.5
+local copyCoordsButton = Instance.new("TextButton",myCoordsFrame); copyCoordsButton.Name = "CopyButton"; copyCoordsButton.Size = UDim2.new(0,65,1,0); copyCoordsButton.Position = UDim2.new(1,-65,0,0); copyCoordsButton.BackgroundColor3 = fantasyColors.Secondary; copyCoordsButton.Font = Enum.Font.Garamond; copyCoordsButton.Text = "Copy"; copyCoordsButton.TextColor3 = fantasyColors.Text; copyCoordsButton.TextSize = 16
+local copyCoordsBtnCorner = Instance.new("UICorner",copyCoordsButton); copyCoordsBtnCorner.CornerRadius = UDim.new(0,4)
+local locationsHeader = Instance.new("TextButton"); locationsHeader.Name = "LocationsHeader"; locationsHeader.Size = UDim2.new(1,-10,0,25); locationsHeader.Position = UDim2.new(0,5,0,65); locationsHeader.BackgroundColor3 = fantasyColors.Primary; locationsHeader.Text = ""; locationsHeader.Parent = mainFrame
+local locHeaderCorner = Instance.new("UICorner"); locHeaderCorner.CornerRadius = UDim.new(0,4); locHeaderCorner.Parent = locationsHeader
+local locHeaderLabel = Instance.new("TextLabel",locationsHeader); locHeaderLabel.Size = UDim2.new(1,-25,1,0); locHeaderLabel.Position = UDim2.new(0,10,0,0); locHeaderLabel.BackgroundTransparency = 1; locHeaderLabel.Font = Enum.Font.Garamond; locHeaderLabel.Text = "สถานที่"; locHeaderLabel.TextColor3 = fantasyColors.Text; locHeaderLabel.TextSize = 18; locHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+local locHeaderIcon = Instance.new("TextLabel",locationsHeader); locHeaderIcon.Name = "Icon"; locHeaderIcon.Size = UDim2.new(0,20,1,0); locHeaderIcon.Position = UDim2.new(1,-25,0,0); locHeaderIcon.BackgroundTransparency = 1; locHeaderIcon.Font = Enum.Font.SourceSansBold; locHeaderIcon.Text = "▼"; locHeaderIcon.TextColor3 = fantasyColors.Highlight; locHeaderIcon.TextSize = 14
+local locationsFrame = Instance.new("ScrollingFrame"); locationsFrame.Name = "LocationsFrame"; locationsFrame.Size = UDim2.new(1,-10,0,205); locationsFrame.Position = UDim2.new(0,5,0,95); locationsFrame.BackgroundTransparency = 1; locationsFrame.BorderSizePixel = 0; locationsFrame.ScrollBarThickness = 6; locationsFrame.ScrollBarImageColor3 = fantasyColors.Highlight; locationsFrame.Parent = mainFrame
+local locListLayout = Instance.new("UIListLayout"); locListLayout.Padding = UDim.new(0,5); locListLayout.Parent = locationsFrame
+local fixedPointButton = Instance.new("TextButton"); fixedPointButton.Name = "FixedPointButton"; fixedPointButton.Size = UDim2.new(1,0,0,35); fixedPointButton.BackgroundColor3 = fantasyColors.Secondary; fixedPointButton.Font = Enum.Font.Garamond; fixedPointButton.Text = "เลเบลฟ้า"; fixedPointButton.TextColor3 = fantasyColors.Text; fixedPointButton.TextSize = 18; fixedPointButton.Parent = locationsFrame
+local fixedPointBtnCorner = Instance.new("UICorner"); fixedPointBtnCorner.CornerRadius = UDim.new(0,6); fixedPointBtnCorner.Parent = fixedPointButton
+local redLabelButton = Instance.new("TextButton"); redLabelButton.Name = "RedLabelButton"; redLabelButton.Size = UDim2.new(1,0,0,35); redLabelButton.BackgroundColor3 = fantasyColors.Secondary; redLabelButton.Font = Enum.Font.Garamond; redLabelButton.Text = "เลเบลแดง"; redLabelButton.TextColor3 = fantasyColors.Text; redLabelButton.TextSize = 18; redLabelButton.Parent = locationsFrame
+local redLabelBtnCorner = Instance.new("UICorner"); redLabelBtnCorner.CornerRadius = UDim.new(0,6); redLabelBtnCorner.Parent = redLabelButton
+local worldMarketButton = Instance.new("TextButton"); worldMarketButton.Name = "WorldMarketButton"; worldMarketButton.Size = UDim2.new(1,0,0,35); worldMarketButton.BackgroundColor3 = fantasyColors.Secondary; worldMarketButton.Font = Enum.Font.Garamond; worldMarketButton.Text = "ตลาดโลก"; worldMarketButton.TextColor3 = fantasyColors.Text; worldMarketButton.TextSize = 18; worldMarketButton.Parent = locationsFrame
+local worldMarketBtnCorner = Instance.new("UICorner"); worldMarketBtnCorner.CornerRadius = UDim.new(0,6); worldMarketBtnCorner.Parent = worldMarketButton
+local grassButton = Instance.new("TextButton"); grassButton.Name = "GrassButton"; grassButton.Size = UDim2.new(1,0,0,35); grassButton.BackgroundColor3 = fantasyColors.Secondary; grassButton.Font = Enum.Font.Garamond; grassButton.Text = "หญ้า"; grassButton.TextColor3 = fantasyColors.Text; grassButton.TextSize = 18; grassButton.Parent = locationsFrame
+local grassBtnCorner = Instance.new("UICorner"); grassBtnCorner.CornerRadius = UDim.new(0,6); grassBtnCorner.Parent = grassButton
+local oreMiningButton = Instance.new("TextButton"); oreMiningButton.Name = "OreMiningButton"; oreMiningButton.Size = UDim2.new(1,0,0,35); oreMiningButton.BackgroundColor3 = fantasyColors.Secondary; oreMiningButton.Font = Enum.Font.Garamond; oreMiningButton.Text = "ขุดแร่"; oreMiningButton.TextColor3 = fantasyColors.Text; oreMiningButton.TextSize = 18; oreMiningButton.Parent = locationsFrame
+local oreMiningBtnCorner = Instance.new("UICorner"); oreMiningBtnCorner.CornerRadius = UDim.new(0,6); oreMiningBtnCorner.Parent = oreMiningButton
+local farmHeader = Instance.new("TextButton"); farmHeader.Name = "FarmHeader"; farmHeader.Size = UDim2.new(1,-10,0,25); farmHeader.Position = UDim2.new(0,5,0,305); farmHeader.BackgroundColor3 = fantasyColors.Primary; farmHeader.Text = ""; farmHeader.Parent = mainFrame
+local farmHeaderCorner = Instance.new("UICorner"); farmHeaderCorner.CornerRadius = UDim.new(0,4); farmHeaderCorner.Parent = farmHeader
+local farmHeaderLabel = Instance.new("TextLabel",farmHeader); farmHeaderLabel.Size = UDim2.new(1,-25,1,0); farmHeaderLabel.Position = UDim2.new(0,10,0,0); farmHeaderLabel.BackgroundTransparency = 1; farmHeaderLabel.Font = Enum.Font.Garamond; farmHeaderLabel.Text = "ฟาม"; farmHeaderLabel.TextColor3 = fantasyColors.Text; farmHeaderLabel.TextSize = 18; farmHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+local farmHeaderIcon = Instance.new("TextLabel",farmHeader); farmHeaderIcon.Name = "Icon"; farmHeaderIcon.Size = UDim2.new(0,20,1,0); farmHeaderIcon.Position = UDim2.new(1,-25,0,0); farmHeaderIcon.BackgroundTransparency = 1; farmHeaderIcon.Font = Enum.Font.SourceSansBold; farmHeaderIcon.Text = "▼"; farmHeaderIcon.TextColor3 = fantasyColors.Highlight; farmHeaderIcon.TextSize = 14
+local farmFrame = Instance.new("Frame"); farmFrame.Name = "FarmFrame"; farmFrame.Size = UDim2.new(1,-10,0,85); farmFrame.Position = UDim2.new(0,5,0,335); farmFrame.BackgroundTransparency = 1; farmFrame.BorderSizePixel = 0; farmFrame.ClipsDescendants = true; farmFrame.Parent = mainFrame
+local farmListLayout = Instance.new("UIListLayout"); farmListLayout.Padding = UDim.new(0,5); farmListLayout.Parent = farmFrame
+local grassFarmButton = Instance.new("TextButton"); grassFarmButton.Name = "GrassFarmButton"; grassFarmButton.Size = UDim2.new(1,0,0,35); grassFarmButton.BackgroundColor3 = fantasyColors.ActiveGreen; grassFarmButton.Font = Enum.Font.Garamond; grassFarmButton.Text = "ฟามหญ้า"; grassFarmButton.TextColor3 = fantasyColors.Text; grassFarmButton.TextSize = 18; grassFarmButton.Parent = farmFrame
+local grassFarmBtnCorner = Instance.new("UICorner"); grassFarmBtnCorner.CornerRadius = UDim.new(0,6); grassFarmBtnCorner.Parent = grassFarmButton
+local oreFarmButton = Instance.new("TextButton"); oreFarmButton.Name = "OreFarmButton"; oreFarmButton.Size = UDim2.new(1,0,0,35); oreFarmButton.BackgroundColor3 = fantasyColors.ActiveGreen; oreFarmButton.Font = Enum.Font.Garamond; oreFarmButton.Text = "ฟามแร่"; oreFarmButton.TextColor3 = fantasyColors.Text; oreFarmButton.TextSize = 18; oreFarmButton.Parent = farmFrame
+local oreFarmBtnCorner = Instance.new("UICorner"); oreFarmBtnCorner.CornerRadius = UDim.new(0,6); oreFarmBtnCorner.Parent = oreFarmButton
+local coordsInput = Instance.new("TextBox"); coordsInput.Name = "CoordsInput"; coordsInput.Size = UDim2.new(1,-80,0,35); coordsInput.Position = UDim2.new(0,5,0,420); coordsInput.BackgroundColor3 = fantasyColors.Primary; coordsInput.Font = Enum.Font.Garamond; coordsInput.Text = "X, Y, Z"; coordsInput.TextColor3 = fantasyColors.Text; coordsInput.TextSize = 16; coordsInput.ClearTextOnFocus = true; coordsInput.Parent = mainFrame
+local coordsCorner = Instance.new("UICorner"); coordsCorner.CornerRadius = UDim.new(0,6); coordsCorner.Parent = coordsInput
+local goToCoordsButton = Instance.new("TextButton"); goToCoordsButton.Name = "GoButton"; goToCoordsButton.Size = UDim2.new(0,65,0,35); goToCoordsButton.Position = UDim2.new(1,-70,0,420); goToCoordsButton.BackgroundColor3 = Color3.fromRGB(80,200,120); goToCoordsButton.Font = Enum.Font.Garamond; goToCoordsButton.Text = "Go"; goToCoordsButton.TextColor3 = fantasyColors.Text; goToCoordsButton.TextSize = 18; goToCoordsButton.Parent = mainFrame
+local goBtnCorner = Instance.new("UICorner"); goBtnCorner.CornerRadius = UDim.new(0,6); goBtnCorner.Parent = goToCoordsButton
+
+-- ###################################################################
+-- ## SECTION 2: ITEM LOOP UI (UI ด้านขวา)
+-- ###################################################################
+
+-- ================== UI Creation (Item Loop) ==================
+local loopMainFrame = Instance.new("Frame")
+loopMainFrame.Name = "LoopMainFrame"
+loopMainFrame.Parent = screenGui
+loopMainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+loopMainFrame.BorderSizePixel = 2
+loopMainFrame.Position = UDim2.new(0.5, 135, 0.5, -230)
+loopMainFrame.Size = UDim2.new(0, 360, 0, 245)
+loopMainFrame.Draggable = true
+loopMainFrame.Active = true
+
+local loopTitleLabel = Instance.new("TextLabel")
+loopTitleLabel.Name = "LoopTitleLabel"
+loopTitleLabel.Parent = loopMainFrame
+loopTitleLabel.Size = UDim2.new(1, 0, 0, 30)
+loopTitleLabel.Font = Enum.Font.SourceSansBold
+loopTitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+loopTitleLabel.TextSize = 18
+
+local loopRockButton = Instance.new("TextButton")
+loopRockButton.Name = "LoopRockButton"; loopRockButton.Parent = loopMainFrame
+loopRockButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+loopRockButton.Position = UDim2.new(0.05, 0, 0, 45)
+loopRockButton.Size = UDim2.new(0.44, 0, 0, 40)
+loopRockButton.Font = Enum.Font.SourceSansBold
+loopRockButton.Text = "เลือก แร่"; loopRockButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopRockButton.TextSize = 16
+
+local loopGrassButton = Instance.new("TextButton")
+loopGrassButton.Name = "LoopGrassButton"; loopGrassButton.Parent = loopMainFrame
+loopGrassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+loopGrassButton.Position = UDim2.new(0.51, 0, 0, 45)
+loopGrassButton.Size = UDim2.new(0.44, 0, 0, 40)
+loopGrassButton.Font = Enum.Font.SourceSansBold
+loopGrassButton.Text = "เลือก หญ้า"; loopGrassButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopGrassButton.TextSize = 16
+
+local loopStartButton = Instance.new("TextButton")
+loopStartButton.Name = "LoopStartButton"; loopStartButton.Parent = loopMainFrame
+loopStartButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+loopStartButton.Position = UDim2.new(0.05, 0, 0, 95)
+loopStartButton.Size = UDim2.new(0.28, 0, 0, 40); loopStartButton.Font = Enum.Font.SourceSansBold
+loopStartButton.Text = "เริ่ม"; loopStartButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopStartButton.TextSize = 16
+
+local loopReverseButton = Instance.new("TextButton")
+loopReverseButton.Name = "LoopReverseButton"; loopReverseButton.Parent = loopMainFrame
+loopReverseButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+loopReverseButton.Position = UDim2.new(0.36, 0, 0, 95)
+loopReverseButton.Size = UDim2.new(0.28, 0, 0, 40); loopReverseButton.Font = Enum.Font.SourceSansBold
+loopReverseButton.Text = "ย้อนกลับ"; loopReverseButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopReverseButton.TextSize = 16
+
+local loopStopButton = Instance.new("TextButton")
+loopStopButton.Name = "LoopStopButton"; loopStopButton.Parent = loopMainFrame
+loopStopButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+loopStopButton.Position = UDim2.new(0.67, 0, 0, 95)
+loopStopButton.Size = UDim2.new(0.28, 0, 0, 40); loopStopButton.Font = Enum.Font.SourceSansBold
+loopStopButton.Text = "หยุด"; loopStopButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopStopButton.TextSize = 16
+
+local loopStatusLabel = Instance.new("TextLabel")
+loopStatusLabel.Name = "LoopStatusLabel"; loopStatusLabel.Parent = loopMainFrame
+loopStatusLabel.BackgroundTransparency = 1; loopStatusLabel.Position = UDim2.new(0, 0, 0, 150)
+loopStatusLabel.Size = UDim2.new(1, 0, 0, 25); loopStatusLabel.Font = Enum.Font.SourceSans
+loopStatusLabel.Text = "สถานะ: หยุดทำงาน"; loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0); loopStatusLabel.TextSize = 14
+
+local loopTeleportButton = Instance.new("TextButton")
+loopTeleportButton.Name = "LoopTeleportButton"; loopTeleportButton.Parent = loopMainFrame
+loopTeleportButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50) -- สีแดง
+loopTeleportButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+loopTeleportButton.Position = UDim2.new(0.05, 0, 0, 190)
+loopTeleportButton.Size = UDim2.new(0.9, 0, 0, 40)
+loopTeleportButton.Font = Enum.Font.SourceSansBold
+loopTeleportButton.Text = "เก็บของเลเบลแดง"
+loopTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+loopTeleportButton.TextSize = 16
+
+-- ###################################################################
+-- ## SECTION 3: CORE VARIABLES & FUNCTIONS (รวมจากสองสคริปต์)
+-- ###################################################################
+
+-- == Variables for Fantasy UI ==
+local isWindowCollapsed, isLocationsCollapsed, isFarmCollapsed = false, false, false
+local locationsFrameOriginalSize = locationsFrame.Size
+local farmFrameOriginalSize = farmFrame.Size
+local IDLE_TIME = 7
+local isGrassFarmEnabled,isGrassFarmMoving,grassFarmIdleTimer=false,false,0; local GRASS_FARM_POS_1=Vector3.new(-2455,75,-2046); local GRASS_FARM_POS_2=Vector3.new(-2457,75,-2020)
+local isOreFarmEnabled,isOreFarmMoving,oreFarmIdleTimer=false,false,0; local ORE_FARM_POS_1=Vector3.new(-309,15,-2437); local ORE_FARM_POS_2=Vector3.new(-242,17,-2451)
+-- NEW AFK Anti-Stuck System
+local AFK_TIMER_DURATION = 12
+local afkTimer = 0
+local isAfkSequenceActive = false
+local lastPlayerPosition = Vector3.new() -- Unified position tracker for all timers
+
+-- == Variables for Item Loop UI ==
+local itemSettings = {
+    Rock = { Name = "Rock", DisplayName = "แร่", Quantity = 100, ThemeColor = Color3.fromRGB(127, 100, 85), HeaderColor = Color3.fromRGB(70, 60, 50) },
+    Grass = { Name = "Grassbush", DisplayName = "หญ้า", Quantity = 80, ThemeColor = Color3.fromRGB(78, 142, 83), HeaderColor = Color3.fromRGB(50, 90, 53) }
+}
+local currentSelection = itemSettings.Rock
+local isLooping = false
+local loopThread = nil
+
+-- ================== Core Functions ==================
+local executeAfkSequence -- Forward declaration
+
+-- == Functions for Fantasy UI ==
+local function performGrassFarmActions(c)local h=c:FindFirstChildOfClass("Humanoid")if not h then return end;isGrassFarmMoving=true;task.spawn(function()NetworkEvent:FireServer("fire",nil,"Move Item",LocalPlayer.Inventory,LocalPlayer.Locker,"Grassbush",80)task.wait(3)if not isGrassFarmEnabled then isGrassFarmMoving=false;return end;h:MoveTo(GRASS_FARM_POS_2)h.MoveToFinished:Wait()isGrassFarmMoving=false end)end
+local function performOreFarmActions(c)local h=c:FindFirstChildOfClass("Humanoid")if not h then return end;isOreFarmMoving=true;task.spawn(function()NetworkEvent:FireServer("fire",nil,"Move Item",LocalPlayer.Inventory,LocalPlayer.Locker,"Rock",100)task.wait(3)if not isOreFarmEnabled then isOreFarmMoving=false;return end;h:MoveTo(ORE_FARM_POS_2)h.MoveToFinished:Wait()isOreFarmMoving=false end)end
+local function stopAllFarms()isGrassFarmEnabled,isGrassFarmMoving,grassFarmIdleTimer=false,false,0;grassFarmButton.Text="ฟามหญ้า";grassFarmButton.BackgroundColor3=fantasyColors.ActiveGreen;isOreFarmEnabled,isOreFarmMoving,oreFarmIdleTimer=false,false,0;oreFarmButton.Text="ฟามแร่";oreFarmButton.BackgroundColor3=fantasyColors.ActiveGreen end
+local function toggleLocationsCollapse() isLocationsCollapsed=not isLocationsCollapsed;local ti=TweenInfo.new(0.3,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out);local ts=isLocationsCollapsed and UDim2.new(1,-10,0,0)or locationsFrameOriginalSize;local h=isLocationsCollapsed and 0 or locationsFrameOriginalSize.Y.Offset;local nfh_y=locationsFrame.Position.Y.Offset+h+5;local nff_y=nfh_y+farmHeader.Size.Y.Offset+5;local ffh=isFarmCollapsed and 0 or farmFrameOriginalSize.Y.Offset;local nci_y=nff_y+ffh+5;locHeaderIcon.Text=isLocationsCollapsed and"▶"or"▼";TweenService:Create(locationsFrame,ti,{Size=ts}):Play();TweenService:Create(farmHeader,ti,{Position=UDim2.new(0,5,0,nfh_y)}):Play();TweenService:Create(farmFrame,ti,{Position=UDim2.new(0,5,0,nff_y)}):Play();TweenService:Create(coordsInput,ti,{Position=UDim2.new(0,5,0,nci_y)}):Play();TweenService:Create(goToCoordsButton,ti,{Position=UDim2.new(1,-70,0,nci_y)}):Play()end
+local function toggleFarmCollapse() isFarmCollapsed=not isFarmCollapsed;local ti=TweenInfo.new(0.3,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out);local ts=isFarmCollapsed and UDim2.new(1,-10,0,0)or farmFrameOriginalSize;local h=isFarmCollapsed and 0 or farmFrameOriginalSize.Y.Offset;local nci_y=farmFrame.Position.Y.Offset+h+5;farmHeaderIcon.Text=isFarmCollapsed and"▶"or"▼";TweenService:Create(farmFrame,ti,{Size=ts}):Play();TweenService:Create(coordsInput,ti,{Position=UDim2.new(0,5,0,nci_y)}):Play();TweenService:Create(goToCoordsButton,ti,{Position=UDim2.new(1,-70,0,nci_y)}):Play()end
+local function toggleWindowCollapse() isWindowCollapsed=not isWindowCollapsed;local os=UDim2.new(0,250,0,460);local cs=UDim2.new(os.X.Scale,os.X.Offset,0,titleBar.AbsoluteSize.Y);local ts=isWindowCollapsed and cs or os;local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out);TweenService:Create(mainFrame,ti,{Size=ts}):Play();toggleButton.Text=isWindowCollapsed and"+"or"–"end
+local function teleportToCoordinates() local t=coordsInput.Text;local p=t:split(",");if #p~=3 then return end;local x,y,z=tonumber(p[1]),tonumber(p[2]),tonumber(p[3]);if x and y and z then local d=50000;if math.abs(x)>d or math.abs(y)>d or math.abs(z)>d then coordsInput.Text="Too far!";return end;if LocalPlayer.Character then LocalPlayer.Character:PivotTo(CFrame.new(x,y,z))end end end
+local function teleportToFixedPoint() local c=LocalPlayer.Character;if not c then return end;c:PivotTo(CFrame.new(1940,14,2311))end
+local function teleportToRedLabel() local c=LocalPlayer.Character;if not c then return end;c:PivotTo(CFrame.new(-3745,77,-564))end
+local function teleportToWorldMarket() local c=LocalPlayer.Character;if not c then return end;c:PivotTo(CFrame.new(2849,17,2111))end
+local function teleportToGrass() local c=LocalPlayer.Character;if not c then return end;c:PivotTo(CFrame.new(-2455,75,-2045))end
+local function teleportToOreMining() local c=LocalPlayer.Character;if not c then return end;c:PivotTo(CFrame.new(-351,17,-2512))end
+
+-- == Functions for Item Loop UI ==
+local function updateUIForSelection()
+    loopTitleLabel.Text = "AKB Loop | " .. currentSelection.DisplayName
+    loopTitleLabel.BackgroundColor3 = currentSelection.HeaderColor
+    loopMainFrame.BorderColor3 = currentSelection.ThemeColor
+    if currentSelection == itemSettings.Rock then
+        loopRockButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+        loopGrassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    else
+        loopRockButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        loopGrassButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+    end
+end
+local function teleportToRedLabelStorage()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(-3893, 77, -602)
+    else
+        warn("ไม่พบตัวละครหรือ HumanoidRootPart!")
+    end
+end
+local function stopLoop()
+    isLooping = false
+    loopThread = nil
+    loopStatusLabel.Text = "สถานะ: หยุดทำงาน"
+    loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+end
+local function startForwardLoop()
+    if isLooping then return end
+    isLooping = true
+    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ไปข้างหน้า) | " .. currentSelection.DisplayName
+    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+    loopThread = coroutine.create(function()
+        while isLooping do
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Safe"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+            if not isLooping then break end
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Locker"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+        end
+    end)
+    coroutine.resume(loopThread)
+end
+
+function executeAfkSequence()
+    if isAfkSequenceActive then return end
+    isAfkSequenceActive = true
+    
+    -- 1. Store current state
+    local wasFarmingGrass = isGrassFarmEnabled
+    local wasFarmingOre = isOreFarmEnabled
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local lastPositionBeforeAfk = rootPart and rootPart.Position
+
+    if not lastPositionBeforeAfk then
+        warn("AFK Sequence cancelled: Could not get player position.")
+        isAfkSequenceActive = false
+        return
+    end
+
+    -- 2. Stop farming and teleport to storage
+    stopAllFarms()
+    teleportToRedLabelStorage()
+    task.wait(1) -- Allow time for teleport to complete
+
+    -- 3. Run item loop for 10 seconds
+    startForwardLoop()
+    task.wait(10)
+    stopLoop()
+    task.wait(0.5) -- Allow time for loop to stop sending events
+
+    -- 4. Teleport back to the original farming spot
+    if character then
+        character:PivotTo(CFrame.new(lastPositionBeforeAfk))
+    end
+    task.wait(1) -- Allow time for teleport
+
+    -- 5. Resume the farm that was active
+    if wasFarmingGrass then
+        isGrassFarmEnabled = true
+        grassFarmButton.Text = "หยุดฟามหญ้า"
+        grassFarmButton.BackgroundColor3 = fantasyColors.StopRed
+    elseif wasFarmingOre then
+        isOreFarmEnabled = true
+        oreFarmButton.Text = "หยุดฟามแร่"
+        oreFarmButton.BackgroundColor3 = fantasyColors.StopRed
+    end
+
+    -- 6. Reset the AFK state
+    isAfkSequenceActive = false
+end
+
+local function startReverseLoop()
+    if isLooping then return end
+    isLooping = true
+    loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ย้อนกลับ) | " .. currentSelection.DisplayName
+    loopStatusLabel.TextColor3 = Color3.fromRGB(0, 191, 255)
+    loopThread = coroutine.create(function()
+        while isLooping do
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Locker"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+            if not isLooping then break end
+            pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Safe"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end)
+            task.wait(0.5)
+        end
+    end)
+    coroutine.resume(loopThread)
+end
+
+-- ###################################################################
+-- ## SECTION 4: EVENT CONNECTIONS
+-- ###################################################################
+
+-- == Connections for Fantasy UI ==
+toggleButton.MouseButton1Click:Connect(toggleWindowCollapse)
+locationsHeader.MouseButton1Click:Connect(toggleLocationsCollapse)
+farmHeader.MouseButton1Click:Connect(toggleFarmCollapse)
+goToCoordsButton.MouseButton1Click:Connect(teleportToCoordinates)
+fixedPointButton.MouseButton1Click:Connect(teleportToFixedPoint)
+redLabelButton.MouseButton1Click:Connect(teleportToRedLabel)
+worldMarketButton.MouseButton1Click:Connect(teleportToWorldMarket)
+grassButton.MouseButton1Click:Connect(teleportToGrass)
+oreMiningButton.MouseButton1Click:Connect(teleportToOreMining)
+grassFarmButton.MouseButton1Click:Connect(function()local wasEnabled=isGrassFarmEnabled;stopAllFarms();if not wasEnabled then isGrassFarmEnabled=true;grassFarmButton.Text="หยุดฟามหญ้า";grassFarmButton.BackgroundColor3=fantasyColors.StopRed end end)
+oreFarmButton.MouseButton1Click:Connect(function()local wasEnabled=isOreFarmEnabled;stopAllFarms();if not wasEnabled then isOreFarmEnabled=true;oreFarmButton.Text="หยุดฟามแร่";oreFarmButton.BackgroundColor3=fantasyColors.StopRed end end)
+copyCoordsButton.MouseButton1Click:Connect(function()local r=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")if r then local p=r.Position;local cs=string.format("%.0f, %.0f, %.0f",p.X,p.Y,p.Z)local s,m=pcall(function()UserInputService:SetClipboardAsync(cs)end)if s then local ot=copyCoordsButton.Text;copyCoordsButton.Text="Copied!";task.wait(1.5);copyCoordsButton.Text=ot else warn("Clipboard failed:",m)end end end)
+
+-- == Connections for Item Loop UI ==
+loopRockButton.MouseButton1Click:Connect(function() if isLooping then return end; currentSelection = itemSettings.Rock; updateUIForSelection() end)
+loopGrassButton.MouseButton1Click:Connect(function() if isLooping then return end; currentSelection = itemSettings.Grass; updateUIForSelection() end)
+loopStartButton.MouseButton1Click:Connect(startForwardLoop)
+loopReverseButton.MouseButton1Click:Connect(startReverseLoop)
+loopStopButton.MouseButton1Click:Connect(stopLoop)
+loopTeleportButton.MouseButton1Click:Connect(teleportToRedLabelStorage)
+
+-- == System Connections ==
+locListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()locationsFrame.CanvasSize=UDim2.fromOffset(0,locListLayout.AbsoluteContentSize.Y)end)
+RunService.Heartbeat:Connect(function(dt)
+    -- Update Coords Display
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        myCoordsLabel.Text = string.format("Coords: %.0f, %.0f, %.0f", LocalPlayer.Character.HumanoidRootPart.Position.X, LocalPlayer.Character.HumanoidRootPart.Position.Y, LocalPlayer.Character.HumanoidRootPart.Position.Z)
+    else
+        myCoordsLabel.Text = "Coords: N/A"
+    end
+
+    -- Get character and root part once
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Check if player is standing still
+    local isStandingStill = (root.Position - lastPlayerPosition).Magnitude < 0.1
+
+    -- Handle standard farm idle timers (for moving between points)
+    if isGrassFarmEnabled then
+        if isStandingStill then grassFarmIdleTimer += dt else grassFarmIdleTimer = 0 end
+        if grassFarmIdleTimer >= IDLE_TIME and not isGrassFarmMoving then
+            performGrassFarmActions(char)
+            grassFarmIdleTimer = 0
+        end
+    end
+    if isOreFarmEnabled then
+        if isStandingStill then oreFarmIdleTimer += dt else oreFarmIdleTimer = 0 end
+        if oreFarmIdleTimer >= IDLE_TIME and not isOreFarmMoving then
+            performOreFarmActions(char)
+            oreFarmIdleTimer = 0
+        end
+    end
+
+    -- Handle the main AFK sequence timer (for getting stuck)
+    if (isGrassFarmEnabled or isOreFarmEnabled) and not isAfkSequenceActive then
+        if isStandingStill then
+            afkTimer = afkTimer + dt
+        else
+            afkTimer = 0
+        end
+
+        if afkTimer >= AFK_TIMER_DURATION then
+            afkTimer = 0 -- Reset immediately
+            task.spawn(executeAfkSequence) -- Run in a new thread to not interrupt the game
+        end
+    else
+        afkTimer = 0 -- Reset if not farming or sequence is already active
+    end
+    
+    -- Update last position for the next frame's check
+    lastPlayerPosition = root.Position
+end)
+
+
+-- ###################################################################
+-- ## SECTION 5: INITIALIZATION
+-- ###################################################################
+updateUIForSelection() -- ตั้งค่า UI เริ่มต้นสำหรับหน้าต่างวนลูป
+print("AKB Combined UI (Fantasy TP + Item Loop) with AFK System Loaded Successfully.")
