@@ -119,7 +119,7 @@ end
 -- =============================================
 local function startAutoProcessLoop()
     while isOreFarmLoopActive do
-        task.wait(180) -- รอ 3 นาที
+        task.wait(1) -- รอ 1 วิ ดีเลโพเซดแร่
         
         if not isOreFarmLoopActive then break end
         
