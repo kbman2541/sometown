@@ -47,6 +47,7 @@ local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodB
 local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
 local SellButton = Instance.new("TextButton"); SellButton.Name = "SellButton"; SellButton.Size = UDim2.new(1, -20, 0, 30); SellButton.Position = UDim2.new(0, 10, 0, 200); SellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); SellButton.Font = Enum.Font.SourceSansBold; SellButton.Text = "ขายแร่"; SellButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellButton.TextSize = 16; SellButton.Parent = MainFrame
 local UICorner_SellBtn = Instance.new("UICorner", SellButton); UICorner_SellBtn.CornerRadius = UDim.new(0, 6)
+
 -- =============================================
 --      Logic & Functions
 -- =============================================
@@ -58,11 +59,8 @@ local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection
 
 -- Farm Loop Variables
 local isOreFarmLoopActive = false
-local isActionRunning = false -- (เพิ่มส่วนนี้) ตัวแปรป้องกันการทำงานซ้ำซ้อน
-local idleTimer = 0
-local lastPosition = Vector3.new()
-local IDLE_DURATION = 5
 local farmDestination = Vector3.new(-350, 24, -2358)
+local autoProcessCoroutine = nil
 
 -- Function: Update Coordinate Display
 RunService.RenderStepped:Connect(function()
@@ -116,21 +114,67 @@ local function executeFarmStep()
     humanoid:MoveTo(farmDestination)
 end
 
+-- =============================================
+--      Automatic 5-Minute Rock Processing
+-- =============================================
+local function startAutoProcessLoop()
+    while isOreFarmLoopActive do
+        task.wait(300) -- รอ 5 นาที
+        
+        if not isOreFarmLoopActive then break end
+        
+        local currentCharacter = LocalPlayer.Character
+        
+        if currentCharacter then
+            print("Auto-processing Rock...")
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+            -- <<<<<<<<<<<<<<< นำเทเลพอร์ตออกจากตรงนี้แล้ว >>>>>>>>>>>>>>>
+        else
+            print("Character not found, skipping process cycle.")
+        end
+    end
+end
+
 -- Function to toggle the farm loop
 local function toggleOreFarmLoop()
     isOreFarmLoopActive = not isOreFarmLoopActive
+    
     if isOreFarmLoopActive then
         FarmOreButton.Text = "หยุดฟามแร่"
         FarmOreButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-        idleTimer = 0
-        lastPosition = HumanoidRootPart.Position
         executeFarmStep()
+        
+        print("Auto-processing timer started (5 minutes).")
+        autoProcessCoroutine = coroutine.create(startAutoProcessLoop)
+        coroutine.resume(autoProcessCoroutine)
     else
         FarmOreButton.Text = "ฟามแร่"
         FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        isActionRunning = false -- (เพิ่มส่วนนี้) หยุดการทำงานทันทีถ้าผู้ใช้กดยกเลิก
+        
+        if autoProcessCoroutine then
+            coroutine.close(autoProcessCoroutine)
+            autoProcessCoroutine = nil
+            print("Auto-processing timer stopped.")
+        end
     end
 end
+
+-- =============================================
+--      Automatic 20-Minute Auto-Eat/Drink
+-- =============================================
+task.spawn(function()
+    while true do
+        task.wait(1200) -- รอ 20 นาที
+        
+        print("Auto-using Bread...")
+        NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
+        
+        task.wait(10) -- รอ 10 วินาที
+        
+        print("Auto-using Water...")
+        NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
+    end
+end)
 
 -- Function: Buy Food
 local function buyFood()
@@ -150,67 +194,19 @@ local function sellRock()
     NetworkEvent:FireServer("fire", nil, "Economy", "Rock", 100)
 end
 
--- (แก้ไขส่วนนี้) ระบบตรวจสอบการยืนนิ่งที่เสถียรขึ้น
-RunService.Heartbeat:Connect(function(deltaTime)
-    if not isOreFarmLoopActive or not Character or not HumanoidRootPart or isActionRunning then return end
-    
-    local currentPosition = HumanoidRootPart.Position
-    
-    if (currentPosition - lastPosition).Magnitude < 0.5 then
-        idleTimer = idleTimer + deltaTime
-    else
-        idleTimer = 0
-    end
-    lastPosition = currentPosition
-
-    if idleTimer >= IDLE_DURATION then
-        isActionRunning = true -- ล็อคไม่ให้ทำงานซ้ำ
-        idleTimer = 0
-        
-        -- (เพิ่มส่วนนี้) ใช้ task.spawn เพื่อไม่ให้ wait(2) ไปขัดขวางการทำงานของเกม
-        task.spawn(function()
-            -- ตรวจสอบอีกครั้ง เผื่อผู้ใช้กดยกเลิกระหว่างรอ
-            if not isOreFarmLoopActive then
-                isActionRunning = false
-                return
-            end
-            
-            -- 1. "กดปุ่ม" ขายแร่
-            sellRock()
-            
-            -- 2. รอ 2 วินาที
-            task.wait(2)
-            
-            -- ตรวจสอบเป็นครั้งสุดท้ายก่อนเริ่มรอบใหม่
-            if not isOreFarmLoopActive then
-                isActionRunning = false
-                return
-            end
-            
-            -- 3. "กดปุ่ม" ฟามแร่ (เริ่มลูปฟาร์มใหม่)
-            executeFarmStep()
-            
-            -- 4. ปลดล็อคเพื่อให้ระบบตรวจจับการยืนนิ่งทำงานต่อได้ในรอบถัดไป
-            isActionRunning = false
-        end)
-    end
-end)
-
 -- =============================================
 --      Event Connections
 -- =============================================
-
 CollapseButton.MouseButton1Click:Connect(toggleCollapse)
 TeleportButton.MouseButton1Click:Connect(teleportPlayer)
 FarmOreButton.MouseButton1Click:Connect(toggleOreFarmLoop)
 BuyFoodButton.MouseButton1Click:Connect(buyFood)
 SellButton.MouseButton1Click:Connect(sellRock)
 
--- เมื่อตัวละครเกิดใหม่ ให้เชื่อม HumanoidRootPart ใหม่อีกครั้ง
+-- Re-establish the HumanoidRootPart connection if the character respawns
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Coordinate UI (Stabilized) Loaded Successfully.")
-
+print("Coordinate UI (Final Version) Loaded Successfully.")
