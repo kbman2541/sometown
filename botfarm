@@ -119,7 +119,7 @@ end
 -- =============================================
 local function startAutoProcessLoop()
     while isOreFarmLoopActive do
-        task.wait(300) -- รอ 5 นาที
+        task.wait(180) -- รอ 3 นาที
         
         if not isOreFarmLoopActive then break end
         
