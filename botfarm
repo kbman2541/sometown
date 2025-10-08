@@ -62,13 +62,46 @@ local isOreFarmLoopActive = false
 local farmDestination = Vector3.new(-350, 24, -2358)
 local autoProcessCoroutine = nil
 
--- Function: Update Coordinate Display
-RunService.RenderStepped:Connect(function()
+-- Anti-Stuck Variables (NEW)
+local lastPosition = Vector3.new()
+local timeStationary = 0
+local antiStuckThreshold = 5 -- 5 วินาที
+
+-- Function: Update Coordinate Display & Anti-Stuck Logic
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Update Coordinate Display
     if HumanoidRootPart and not isCollapsed then
         local pos = HumanoidRootPart.Position
         CoordinateLabel.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", pos.X, pos.Y, pos.Z)
     end
+
+    -- Anti-Stuck Logic (NEW) - จะทำงานต่อเมื่อเปิดฟาร์มเท่านั้น
+    if not isOreFarmLoopActive or not Character or not HumanoidRootPart then
+        return
+    end
+
+    local currentPosition = HumanoidRootPart.Position
+    -- ตรวจสอบว่าเคลื่อนที่น้อยกว่า 0.5 stud หรือไม่ (เพื่อความแม่นยำ)
+    if (currentPosition - lastPosition).Magnitude < 0.5 then
+        -- ถ้าไม่เคลื่อนที่ ให้บวกเวลาเพิ่ม
+        timeStationary = timeStationary + deltaTime
+    else
+        -- ถ้าเคลื่อนที่ ให้รีเซ็ตเวลาและอัปเดตตำแหน่งล่าสุด
+        timeStationary = 0
+        lastPosition = currentPosition
+    end
+
+    -- ถ้าหยุดนิ่งเกินเวลาที่กำหนด ให้เดินใหม่
+    if timeStationary >= antiStuckThreshold then
+        print("Anti-Stuck Triggered: Player stationary for >5 seconds. Re-moving.")
+        local humanoid = Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:MoveTo(farmDestination)
+        end
+        timeStationary = 0 -- รีเซ็ตเวลาทันทีเพื่อไม่ให้ทำงานซ้ำ
+    end
 end)
+
 
 -- Function: Toggle Collapse/Expand
 local function toggleCollapse()
@@ -115,11 +148,11 @@ local function executeFarmStep()
 end
 
 -- =============================================
---      Automatic 5-Minute Rock Processing
+--      Automatic 1-Minute Rock Processing
 -- =============================================
 local function startAutoProcessLoop()
     while isOreFarmLoopActive do
-        task.wait(1) -- รอ 1 วิ ดีเลโพเซดแร่
+        task.wait(60) -- รอ 60 วิ ดีเลโพเซดแร่
         
         if not isOreFarmLoopActive then break end
         
@@ -128,7 +161,6 @@ local function startAutoProcessLoop()
         if currentCharacter then
             print("Auto-processing Rock...")
             NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-            -- <<<<<<<<<<<<<<< นำเทเลพอร์ตออกจากตรงนี้แล้ว >>>>>>>>>>>>>>>
         else
             print("Character not found, skipping process cycle.")
         end
@@ -142,9 +174,16 @@ local function toggleOreFarmLoop()
     if isOreFarmLoopActive then
         FarmOreButton.Text = "หยุดฟามแร่"
         FarmOreButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        
+        -- Initialize Anti-Stuck variables (NEW)
+        if HumanoidRootPart then
+            lastPosition = HumanoidRootPart.Position
+        end
+        timeStationary = 0
+
         executeFarmStep()
         
-        print("Auto-processing timer started (5 minutes).")
+        print("Auto-processing timer started (1 minute).")
         autoProcessCoroutine = coroutine.create(startAutoProcessLoop)
         coroutine.resume(autoProcessCoroutine)
     else
@@ -209,4 +248,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Coordinate UI (Final Version) Loaded Successfully.")
+print("Coordinate UI (Final Version with Anti-Stuck) Loaded Successfully.")
