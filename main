@@ -1,6 +1,6 @@
 -- ===================================================================
--- ## AKB MASTER UI - (TP + Item Loop + Auto Farm) - v3.0         ##
--- ##                 Merged by Gemini for AKB Akibus Shop          ##
+-- ## AKB MASTER UI - (TP + Item Loop + Auto Farm + Player TP) - v4.0 ##
+-- ##             Merged by Gemini for AKB Akibus Shop              ##
 -- ===================================================================
 
 -- ###################################################################
@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -20,6 +21,8 @@ local NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net
 pcall(function() PlayerGui:FindFirstChild("AKB_MasterUI"):Destroy() end)
 pcall(function() PlayerGui:FindFirstChild("AKB_CombinedUI"):Destroy() end)
 pcall(function() PlayerGui:FindFirstChild("FantasyFarmGUI"):Destroy() end)
+pcall(function() PlayerGui:FindFirstChild("PlayerTeleportGui"):Destroy() end)
+
 
 -- Main ScreenGui
 local screenGui = Instance.new("ScreenGui");
@@ -32,7 +35,7 @@ screenGui.Parent = PlayerGui
 -- ## SECTION 1: FANTASY TELEPORT & FARM UI (UI ด้านซ้าย)
 -- ###################################################################
 local fantasyColors = { Background=Color3.fromRGB(25,20,40), Primary=Color3.fromRGB(45,35,70), Secondary=Color3.fromRGB(0,150,160), Highlight=Color3.fromRGB(255,220,100), Text=Color3.fromRGB(240,230,255), TextGold=Color3.fromRGB(255,235,170), ActiveGreen=Color3.fromRGB(0,170,81), StopRed=Color3.fromRGB(200,40,40) }
-local mainFrame = Instance.new("Frame"); mainFrame.Name = "MainFrame"; mainFrame.Size = UDim2.new(0,250,0,460); mainFrame.Position = UDim2.new(0.5,-385,0.5,-230); mainFrame.BackgroundColor3 = fantasyColors.Background; mainFrame.BorderSizePixel = 0; mainFrame.ClipsDescendants = true; mainFrame.Active = true; mainFrame.Draggable = true; mainFrame.Parent = screenGui
+local mainFrame = Instance.new("Frame"); mainFrame.Name = "MainFrame"; mainFrame.Size = UDim2.new(0,250,0,505); mainFrame.Position = UDim2.new(0.5,-520,0.5,-252); mainFrame.BackgroundColor3 = fantasyColors.Background; mainFrame.BorderSizePixel = 0; mainFrame.ClipsDescendants = true; mainFrame.Active = true; mainFrame.Draggable = true; mainFrame.Parent = screenGui
 local uiCorner = Instance.new("UICorner"); uiCorner.CornerRadius = UDim.new(0,8); uiCorner.Parent = mainFrame
 local mainStroke = Instance.new("UIStroke"); mainStroke.Color = fantasyColors.Highlight; mainStroke.Thickness = 1; mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; mainStroke.Parent = mainFrame
 local titleBar = Instance.new("Frame"); titleBar.Name = "TitleBar"; titleBar.Size = UDim2.new(1,0,0,30); titleBar.BackgroundColor3 = fantasyColors.Primary; titleBar.BorderSizePixel = 0; titleBar.Parent = mainFrame
@@ -50,7 +53,7 @@ local locationsHeader = Instance.new("TextButton"); locationsHeader.Name = "Loca
 local locHeaderCorner = Instance.new("UICorner"); locHeaderCorner.CornerRadius = UDim.new(0,4); locHeaderCorner.Parent = locationsHeader
 local locHeaderLabel = Instance.new("TextLabel",locationsHeader); locHeaderLabel.Size = UDim2.new(1,-25,1,0); locHeaderLabel.Position = UDim2.new(0,10,0,0); locHeaderLabel.BackgroundTransparency = 1; locHeaderLabel.Font = Enum.Font.Garamond; locHeaderLabel.Text = "สถานที่"; locHeaderLabel.TextColor3 = fantasyColors.Text; locHeaderLabel.TextSize = 18; locHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
 local locHeaderIcon = Instance.new("TextLabel",locationsHeader); locHeaderIcon.Name = "Icon"; locHeaderIcon.Size = UDim2.new(0,20,1,0); locHeaderIcon.Position = UDim2.new(1,-25,0,0); locHeaderIcon.BackgroundTransparency = 1; locHeaderIcon.Font = Enum.Font.SourceSansBold; locHeaderIcon.Text = "▼"; locHeaderIcon.TextColor3 = fantasyColors.Highlight; locHeaderIcon.TextSize = 14
-local locationsFrame = Instance.new("ScrollingFrame"); locationsFrame.Name = "LocationsFrame"; locationsFrame.Size = UDim2.new(1,-10,0,205); locationsFrame.Position = UDim2.new(0,5,0,95); locationsFrame.BackgroundTransparency = 1; locationsFrame.BorderSizePixel = 0; locationsFrame.ScrollBarThickness = 6; locationsFrame.ScrollBarImageColor3 = fantasyColors.Highlight; locationsFrame.Parent = mainFrame
+local locationsFrame = Instance.new("ScrollingFrame"); locationsFrame.Name = "LocationsFrame"; locationsFrame.Size = UDim2.new(1,-10,0,250); locationsFrame.Position = UDim2.new(0,5,0,95); locationsFrame.BackgroundTransparency = 1; locationsFrame.BorderSizePixel = 0; locationsFrame.ScrollBarThickness = 6; locationsFrame.ScrollBarImageColor3 = fantasyColors.Highlight; locationsFrame.Parent = mainFrame
 local locListLayout = Instance.new("UIListLayout"); locListLayout.Padding = UDim.new(0,5); locListLayout.Parent = locationsFrame
 local fixedPointButton = Instance.new("TextButton"); fixedPointButton.Name = "FixedPointButton"; fixedPointButton.Size = UDim2.new(1,0,0,35); fixedPointButton.BackgroundColor3 = fantasyColors.Secondary; fixedPointButton.Font = Enum.Font.Garamond; fixedPointButton.Text = "เลเบลฟ้า"; fixedPointButton.TextColor3 = fantasyColors.Text; fixedPointButton.TextSize = 18; fixedPointButton.Parent = locationsFrame
 local fixedPointBtnCorner = Instance.new("UICorner"); fixedPointBtnCorner.CornerRadius = UDim.new(0,6); fixedPointBtnCorner.Parent = fixedPointButton
@@ -62,25 +65,27 @@ local grassButton = Instance.new("TextButton"); grassButton.Name = "GrassButton"
 local grassBtnCorner = Instance.new("UICorner"); grassBtnCorner.CornerRadius = UDim.new(0,6); grassBtnCorner.Parent = grassButton
 local oreMiningButton = Instance.new("TextButton"); oreMiningButton.Name = "OreMiningButton"; oreMiningButton.Size = UDim2.new(1,0,0,35); oreMiningButton.BackgroundColor3 = fantasyColors.Secondary; oreMiningButton.Font = Enum.Font.Garamond; oreMiningButton.Text = "ขุดแร่"; oreMiningButton.TextColor3 = fantasyColors.Text; oreMiningButton.TextSize = 18; oreMiningButton.Parent = locationsFrame
 local oreMiningBtnCorner = Instance.new("UICorner"); oreMiningBtnCorner.CornerRadius = UDim.new(0,6); oreMiningBtnCorner.Parent = oreMiningButton
-local farmHeader = Instance.new("TextButton"); farmHeader.Name = "FarmHeader"; farmHeader.Size = UDim2.new(1,-10,0,25); farmHeader.Position = UDim2.new(0,5,0,305); farmHeader.BackgroundColor3 = fantasyColors.Primary; farmHeader.Text = ""; farmHeader.Parent = mainFrame
+local playerListToggleButton = Instance.new("TextButton"); playerListToggleButton.Name = "PlayerListToggleButton"; playerListToggleButton.Size = UDim2.new(1,0,0,35); playerListToggleButton.BackgroundColor3 = fantasyColors.Secondary; playerListToggleButton.Font = Enum.Font.Garamond; playerListToggleButton.Text = "รายชื่อผู้เล่น"; playerListToggleButton.TextColor3 = fantasyColors.Text; playerListToggleButton.TextSize = 18; playerListToggleButton.Parent = locationsFrame
+local playerListToggleBtnCorner = Instance.new("UICorner"); playerListToggleBtnCorner.CornerRadius = UDim.new(0,6); playerListToggleBtnCorner.Parent = playerListToggleButton
+local farmHeader = Instance.new("TextButton"); farmHeader.Name = "FarmHeader"; farmHeader.Size = UDim2.new(1,-10,0,25); farmHeader.Position = UDim2.new(0,5,0,350); farmHeader.BackgroundColor3 = fantasyColors.Primary; farmHeader.Text = ""; farmHeader.Parent = mainFrame
 local farmHeaderCorner = Instance.new("UICorner"); farmHeaderCorner.CornerRadius = UDim.new(0,4); farmHeaderCorner.Parent = farmHeader
 local farmHeaderLabel = Instance.new("TextLabel",farmHeader); farmHeaderLabel.Size = UDim2.new(1,-25,1,0); farmHeaderLabel.Position = UDim2.new(0,10,0,0); farmHeaderLabel.BackgroundTransparency = 1; farmHeaderLabel.Font = Enum.Font.Garamond; farmHeaderLabel.Text = "AFK Farm"; farmHeaderLabel.TextColor3 = fantasyColors.Text; farmHeaderLabel.TextSize = 18; farmHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
 local farmHeaderIcon = Instance.new("TextLabel",farmHeader); farmHeaderIcon.Name = "Icon"; farmHeaderIcon.Size = UDim2.new(0,20,1,0); farmHeaderIcon.Position = UDim2.new(1,-25,0,0); farmHeaderIcon.BackgroundTransparency = 1; farmHeaderIcon.Font = Enum.Font.SourceSansBold; farmHeaderIcon.Text = "▼"; farmHeaderIcon.TextColor3 = fantasyColors.Highlight; farmHeaderIcon.TextSize = 14
-local farmFrame = Instance.new("Frame"); farmFrame.Name = "FarmFrame"; farmFrame.Size = UDim2.new(1,-10,0,85); farmFrame.Position = UDim2.new(0,5,0,335); farmFrame.BackgroundTransparency = 1; farmFrame.BorderSizePixel = 0; farmFrame.ClipsDescendants = true; farmFrame.Parent = mainFrame
+local farmFrame = Instance.new("Frame"); farmFrame.Name = "FarmFrame"; farmFrame.Size = UDim2.new(1,-10,0,85); farmFrame.Position = UDim2.new(0,5,0,380); farmFrame.BackgroundTransparency = 1; farmFrame.BorderSizePixel = 0; farmFrame.ClipsDescendants = true; farmFrame.Parent = mainFrame
 local farmListLayout = Instance.new("UIListLayout"); farmListLayout.Padding = UDim.new(0,5); farmListLayout.Parent = farmFrame
 local grassFarmButton = Instance.new("TextButton"); grassFarmButton.Name = "GrassFarmButton"; grassFarmButton.Size = UDim2.new(1,0,0,35); grassFarmButton.BackgroundColor3 = fantasyColors.ActiveGreen; grassFarmButton.Font = Enum.Font.Garamond; grassFarmButton.Text = "ฟามหญ้า"; grassFarmButton.TextColor3 = fantasyColors.Text; grassFarmButton.TextSize = 18; grassFarmButton.Parent = farmFrame
 local grassFarmBtnCorner = Instance.new("UICorner"); grassFarmBtnCorner.CornerRadius = UDim.new(0,6); grassFarmBtnCorner.Parent = grassFarmButton
 local oreFarmButton = Instance.new("TextButton"); oreFarmButton.Name = "OreFarmButton"; oreFarmButton.Size = UDim2.new(1,0,0,35); oreFarmButton.BackgroundColor3 = fantasyColors.ActiveGreen; oreFarmButton.Font = Enum.Font.Garamond; oreFarmButton.Text = "ฟามแร่"; oreFarmButton.TextColor3 = fantasyColors.Text; oreFarmButton.TextSize = 18; oreFarmButton.Parent = farmFrame
 local oreFarmBtnCorner = Instance.new("UICorner"); oreFarmBtnCorner.CornerRadius = UDim.new(0,6); oreFarmBtnCorner.Parent = oreFarmButton
-local coordsInput = Instance.new("TextBox"); coordsInput.Name = "CoordsInput"; coordsInput.Size = UDim2.new(1,-80,0,35); coordsInput.Position = UDim2.new(0,5,0,420); coordsInput.BackgroundColor3 = fantasyColors.Primary; coordsInput.Font = Enum.Font.Garamond; coordsInput.Text = "X, Y, Z"; coordsInput.TextColor3 = fantasyColors.Text; coordsInput.TextSize = 16; coordsInput.ClearTextOnFocus = true; coordsInput.Parent = mainFrame
+local coordsInput = Instance.new("TextBox"); coordsInput.Name = "CoordsInput"; coordsInput.Size = UDim2.new(1,-80,0,35); coordsInput.Position = UDim2.new(0,5,0,465); coordsInput.BackgroundColor3 = fantasyColors.Primary; coordsInput.Font = Enum.Font.Garamond; coordsInput.Text = "X, Y, Z"; coordsInput.TextColor3 = fantasyColors.Text; coordsInput.TextSize = 16; coordsInput.ClearTextOnFocus = true; coordsInput.Parent = mainFrame
 local coordsCorner = Instance.new("UICorner"); coordsCorner.CornerRadius = UDim.new(0,6); coordsCorner.Parent = coordsInput
-local goToCoordsButton = Instance.new("TextButton"); goToCoordsButton.Name = "GoButton"; goToCoordsButton.Size = UDim2.new(0,65,0,35); goToCoordsButton.Position = UDim2.new(1,-70,0,420); goToCoordsButton.BackgroundColor3 = Color3.fromRGB(80,200,120); goToCoordsButton.Font = Enum.Font.Garamond; goToCoordsButton.Text = "Go"; goToCoordsButton.TextColor3 = fantasyColors.Text; goToCoordsButton.TextSize = 18; goToCoordsButton.Parent = mainFrame
+local goToCoordsButton = Instance.new("TextButton"); goToCoordsButton.Name = "GoButton"; goToCoordsButton.Size = UDim2.new(0,65,0,35); goToCoordsButton.Position = UDim2.new(1,-70,0,465); goToCoordsButton.BackgroundColor3 = Color3.fromRGB(80,200,120); goToCoordsButton.Font = Enum.Font.Garamond; goToCoordsButton.Text = "Go"; goToCoordsButton.TextColor3 = fantasyColors.Text; goToCoordsButton.TextSize = 18; goToCoordsButton.Parent = mainFrame
 local goBtnCorner = Instance.new("UICorner"); goBtnCorner.CornerRadius = UDim.new(0,6); goBtnCorner.Parent = goToCoordsButton
 
 -- ###################################################################
 -- ## SECTION 2: ITEM LOOP UI (UI ด้านขวา)
 -- ###################################################################
-local loopMainFrame = Instance.new("Frame"); loopMainFrame.Name = "LoopMainFrame"; loopMainFrame.Parent = screenGui; loopMainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45); loopMainFrame.BorderSizePixel = 2; loopMainFrame.Position = UDim2.new(0.5, 135, 0.5, -230); loopMainFrame.Size = UDim2.new(0, 360, 0, 245); loopMainFrame.Draggable = true; loopMainFrame.Active = true
+local loopMainFrame = Instance.new("Frame"); loopMainFrame.Name = "LoopMainFrame"; loopMainFrame.Parent = screenGui; loopMainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45); loopMainFrame.BorderSizePixel = 2; loopMainFrame.Position = UDim2.new(0.5, -260, 0.5, -230); loopMainFrame.Size = UDim2.new(0, 360, 0, 245); loopMainFrame.Draggable = true; loopMainFrame.Active = true
 local loopTitleLabel = Instance.new("TextLabel"); loopTitleLabel.Name = "LoopTitleLabel"; loopTitleLabel.Parent = loopMainFrame; loopTitleLabel.Size = UDim2.new(1, 0, 0, 30); loopTitleLabel.Font = Enum.Font.SourceSansBold; loopTitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); loopTitleLabel.TextSize = 18
 local loopRockButton = Instance.new("TextButton"); loopRockButton.Name = "LoopRockButton"; loopRockButton.Parent = loopMainFrame; loopRockButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100); loopRockButton.Position = UDim2.new(0.05, 0, 0, 45); loopRockButton.Size = UDim2.new(0.44, 0, 0, 40); loopRockButton.Font = Enum.Font.SourceSansBold; loopRockButton.Text = "เลือก แร่"; loopRockButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopRockButton.TextSize = 16
 local loopGrassButton = Instance.new("TextButton"); loopGrassButton.Name = "LoopGrassButton"; loopGrassButton.Parent = loopMainFrame; loopGrassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70); loopGrassButton.Position = UDim2.new(0.51, 0, 0, 45); loopGrassButton.Size = UDim2.new(0.44, 0, 0, 40); loopGrassButton.Font = Enum.Font.SourceSansBold; loopGrassButton.Text = "เลือก หญ้า"; loopGrassButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopGrassButton.TextSize = 16
@@ -89,6 +94,16 @@ local loopReverseButton = Instance.new("TextButton"); loopReverseButton.Name = "
 local loopStopButton = Instance.new("TextButton"); loopStopButton.Name = "LoopStopButton"; loopStopButton.Parent = loopMainFrame; loopStopButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40); loopStopButton.Position = UDim2.new(0.67, 0, 0, 95); loopStopButton.Size = UDim2.new(0.28, 0, 0, 40); loopStopButton.Font = Enum.Font.SourceSansBold; loopStopButton.Text = "หยุด"; loopStopButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopStopButton.TextSize = 16
 local loopStatusLabel = Instance.new("TextLabel"); loopStatusLabel.Name = "LoopStatusLabel"; loopStatusLabel.Parent = loopMainFrame; loopStatusLabel.BackgroundTransparency = 1; loopStatusLabel.Position = UDim2.new(0, 0, 0, 150); loopStatusLabel.Size = UDim2.new(1, 0, 0, 25); loopStatusLabel.Font = Enum.Font.SourceSans; loopStatusLabel.Text = "สถานะ: หยุดทำงาน"; loopStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0); loopStatusLabel.TextSize = 14
 local loopTeleportButton = Instance.new("TextButton"); loopTeleportButton.Name = "LoopTeleportButton"; loopTeleportButton.Parent = loopMainFrame; loopTeleportButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50); loopTeleportButton.BorderColor3 = Color3.fromRGB(255, 255, 255); loopTeleportButton.Position = UDim2.new(0.05, 0, 0, 190); loopTeleportButton.Size = UDim2.new(0.9, 0, 0, 40); loopTeleportButton.Font = Enum.Font.SourceSansBold; loopTeleportButton.Text = "เก็บของเลเบลแดง"; loopTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255); loopTeleportButton.TextSize = 16
+
+-- ###################################################################
+-- ## SECTION 2.5: PLAYER TELEPORT UI (UI ด้านขวาสุด)
+-- ###################################################################
+local playerTeleportFrame = Instance.new("Frame"); playerTeleportFrame.Name = "PlayerTeleportFrame"; playerTeleportFrame.Parent = screenGui; playerTeleportFrame.Size = UDim2.new(0, 200, 0, 300); playerTeleportFrame.Position = UDim2.new(0.5, 110, 0.5, -230); playerTeleportFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40); playerTeleportFrame.BackgroundTransparency = 0.3; playerTeleportFrame.BorderColor3 = Color3.fromRGB(120, 120, 120); playerTeleportFrame.BorderSizePixel = 1; playerTeleportFrame.Active = true; playerTeleportFrame.Draggable = true; playerTeleportFrame.Visible = true;
+local pt_Corner = Instance.new("UICorner"); pt_Corner.Parent = playerTeleportFrame
+local pt_TitleBar = Instance.new("TextLabel"); pt_TitleBar.Name = "TitleBar"; pt_TitleBar.Parent = playerTeleportFrame; pt_TitleBar.Size = UDim2.new(1, 0, 0, 30); pt_TitleBar.BackgroundColor3 = fantasyColors.Primary; pt_TitleBar.Font = Enum.Font.Garamond; pt_TitleBar.Text = "Player List"; pt_TitleBar.TextColor3 = fantasyColors.TextGold; pt_TitleBar.TextSize = 20
+local pt_TitleCorner = Instance.new("UICorner"); pt_TitleCorner.Parent = pt_TitleBar
+local playerListContentFrame = Instance.new("ScrollingFrame"); playerListContentFrame.Name = "PlayerListContentFrame"; playerListContentFrame.Parent = playerTeleportFrame; playerListContentFrame.Size = UDim2.new(1, 0, 1, -30); playerListContentFrame.Position = UDim2.new(0, 0, 0, 30); playerListContentFrame.BackgroundTransparency = 1; playerListContentFrame.BorderSizePixel = 0; playerListContentFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListContentFrame.ScrollBarThickness = 8
+local playerListLayout = Instance.new("UIListLayout"); playerListLayout.Parent = playerListContentFrame; playerListLayout.SortOrder = Enum.SortOrder.Name; playerListLayout.Padding = UDim.new(0, 5); playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 -- ###################################################################
 -- ## SECTION 3: FANTASY AUTO FARM UI (UI ด้านบน)
@@ -144,7 +159,7 @@ local function performOreFarmActions(c) local h=c:FindFirstChildOfClass("Humanoi
 local function stopAllFarms() isGrassFarmEnabled,isGrassFarmMoving,grassFarmIdleTimer=false,false,0;grassFarmButton.Text="ฟามหญ้า";grassFarmButton.BackgroundColor3=fantasyColors.ActiveGreen;isOreFarmEnabled,isOreFarmMoving,oreFarmIdleTimer=false,false,0;oreFarmButton.Text="ฟามแร่";oreFarmButton.BackgroundColor3=fantasyColors.ActiveGreen end
 local function toggleLocationsCollapse() isLocationsCollapsed=not isLocationsCollapsed;local ti=TweenInfo.new(0.3,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out);local ts=isLocationsCollapsed and UDim2.new(1,-10,0,0)or locationsFrameOriginalSize;local h=isLocationsCollapsed and 0 or locationsFrameOriginalSize.Y.Offset;local nfh_y=locationsFrame.Position.Y.Offset+h+5;local nff_y=nfh_y+farmHeader.Size.Y.Offset+5;local ffh=isFarmCollapsed and 0 or farmFrameOriginalSize.Y.Offset;local nci_y=nff_y+ffh+5;locHeaderIcon.Text=isLocationsCollapsed and"▶"or"▼";TweenService:Create(locationsFrame,ti,{Size=ts}):Play();TweenService:Create(farmHeader,ti,{Position=UDim2.new(0,5,0,nfh_y)}):Play();TweenService:Create(farmFrame,ti,{Position=UDim2.new(0,5,0,nff_y)}):Play();TweenService:Create(coordsInput,ti,{Position=UDim2.new(0,5,0,nci_y)}):Play();TweenService:Create(goToCoordsButton,ti,{Position=UDim2.new(1,-70,0,nci_y)}):Play()end
 local function toggleFarmCollapse() isFarmCollapsed=not isFarmCollapsed;local ti=TweenInfo.new(0.3,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out);local ts=isFarmCollapsed and UDim2.new(1,-10,0,0)or farmFrameOriginalSize;local h=isFarmCollapsed and 0 or farmFrameOriginalSize.Y.Offset;local nci_y=farmFrame.Position.Y.Offset+h+5;farmHeaderIcon.Text=isFarmCollapsed and"▶"or"▼";TweenService:Create(farmFrame,ti,{Size=ts}):Play();TweenService:Create(coordsInput,ti,{Position=UDim2.new(0,5,0,nci_y)}):Play();TweenService:Create(goToCoordsButton,ti,{Position=UDim2.new(1,-70,0,nci_y)}):Play()end
-local function toggleWindowCollapse() isWindowCollapsed=not isWindowCollapsed;local os=UDim2.new(0,250,0,460);local cs=UDim2.new(os.X.Scale,os.X.Offset,0,titleBar.AbsoluteSize.Y);local ts=isWindowCollapsed and cs or os;local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out);TweenService:Create(mainFrame,ti,{Size=ts}):Play();toggleButton.Text=isWindowCollapsed and"+"or"–"end
+local function toggleWindowCollapse() isWindowCollapsed=not isWindowCollapsed;local os=UDim2.new(0,250,0,505);local cs=UDim2.new(os.X.Scale,os.X.Offset,0,titleBar.AbsoluteSize.Y);local ts=isWindowCollapsed and cs or os;local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out);TweenService:Create(mainFrame,ti,{Size=ts}):Play();toggleButton.Text=isWindowCollapsed and"+"or"–"end
 local function teleportToCoordinates() local t=coordsInput.Text;local p=t:split(",");if #p~=3 then return end;local x,y,z=tonumber(p[1]),tonumber(p[2]),tonumber(p[3]);if x and y and z then local d=50000;if math.abs(x)>d or math.abs(y)>d or math.abs(z)>d then coordsInput.Text="Too far!";return end;if LocalPlayer.Character then LocalPlayer.Character:PivotTo(CFrame.new(x,y,z))end end end
 local function teleportToFixedPoint() if LocalPlayer.Character then LocalPlayer.Character:PivotTo(CFrame.new(1940,14,2311)) end end
 local function teleportToRedLabel() if LocalPlayer.Character then LocalPlayer.Character:PivotTo(CFrame.new(-3745,77,-564)) end end
@@ -161,6 +176,54 @@ local function stopLoop() isLooping = false; loopThread = nil; loopStatusLabel.T
 local function startForwardLoop() if isLooping then return end; isLooping = true; loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ไปข้างหน้า) | " .. currentSelection.DisplayName; loopStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127); loopThread = coroutine.create(function() while isLooping do pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Safe"), currentSelection.Name, currentSelection.Quantity) end); task.wait(0.5); if not isLooping then break end; pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Locker"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end); task.wait(0.5) end end); coroutine.resume(loopThread) end
 local function startReverseLoop() if isLooping then return end; isLooping = true; loopStatusLabel.Text = "สถานะ: กำลังทำงาน (ย้อนกลับ) | " .. currentSelection.DisplayName; loopStatusLabel.TextColor3 = Color3.fromRGB(0, 191, 255); loopThread = coroutine.create(function() while isLooping do pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Inventory"), LocalPlayer:WaitForChild("Locker"), currentSelection.Name, currentSelection.Quantity) end); task.wait(0.5); if not isLooping then break end; pcall(function() NetworkEvent:FireServer("fire", nil, "Move Item", LocalPlayer:WaitForChild("Safe"), LocalPlayer:WaitForChild("Inventory"), currentSelection.Name, currentSelection.Quantity) end); task.wait(0.5) end end); coroutine.resume(loopThread) end
 
+-- == Variables & Functions for Player Teleport UI ==
+local function teleportToObject(targetPlayer)
+    local localCharacter = LocalPlayer.Character
+    local characterFolder = Workspace:FindFirstChild("Character")
+    local targetObject = characterFolder and characterFolder:FindFirstChild(targetPlayer.Name)
+    if localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") and targetObject then
+        local targetPosition
+        if targetObject:IsA("Model") and targetObject.PrimaryPart then
+            targetPosition = targetObject.PrimaryPart.Position
+        elseif targetObject:IsA("BasePart") then
+            targetPosition = targetObject.Position
+        else
+            warn("ไม่สามารถหาตำแหน่งของ Object ได้: '" .. targetObject.Name .. "' ไม่มี PrimaryPart หรือไม่ใช่ BasePart")
+            return
+        end
+        local success, err = pcall(function()
+            print("กำลังเทเลพอร์ตไปยัง Object ของ " .. targetPlayer.Name .. "...")
+            localCharacter.HumanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
+        end)
+        if not success then warn("ไม่สามารถเทเลพอร์ตได้: ", err) end
+    else
+        if not targetObject then print("ไม่สามารถเทเลพอร์ตได้: ไม่พบ Object ของผู้เล่น '" .. targetPlayer.Name .. "' ใน workspace.Character")
+        else print("ไม่สามารถเทเลพอร์ตได้: ไม่พบตัวละครของผู้เล่นปัจจุบัน") end
+    end
+end
+local function updatePlayerList()
+    if not playerListContentFrame or not playerListContentFrame.Parent then return end
+    local existingButtons = {}
+    for _, child in ipairs(playerListContentFrame:GetChildren()) do if child:IsA("TextButton") then existingButtons[child.Name] = child end end
+    local characterFolder = Workspace:FindFirstChild("Character")
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+        local targetObject = characterFolder and characterFolder:FindFirstChild(player.Name)
+        if targetObject then
+            if not existingButtons[player.Name] then
+                local playerButton = Instance.new("TextButton")
+                playerButton.Name = player.Name; playerButton.Text = player.DisplayName
+                playerButton.Size = UDim2.new(1, -10, 0, 30); playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                playerButton.TextColor3 = Color3.fromRGB(255, 255, 255); playerButton.Font = Enum.Font.SourceSans
+                playerButton.TextSize = 16; playerButton.AutoButtonColor = true; playerButton.Parent = playerListContentFrame
+                playerButton.MouseButton1Click:Connect(function() teleportToObject(player) end)
+            end
+            existingButtons[player.Name] = nil
+        end
+    end
+    for playerName, button in pairs(existingButtons) do button:Destroy() end
+end
+
 -- == Variables & Functions for Fantasy Auto Farm UI ==
 local isFantasyFarmDragging, ff_dragStart, ff_startPos, isFantasyFarmMinimized = false, nil, nil, false
 local ff_originalSize = fantasyFarmFrame.Size
@@ -171,7 +234,8 @@ local function toggleEconomyFarm() isEconomyFarming = not isEconomyFarming; if i
 -- == AFK System & Master Toggle ==
 function executeAfkSequence() if isAfkSequenceActive then return end; isAfkSequenceActive = true; local wasFarmingGrass = isGrassFarmEnabled; local wasFarmingOre = isOreFarmEnabled; local character = LocalPlayer.Character; local rootPart = character and character:FindFirstChild("HumanoidRootPart"); local lastPositionBeforeAfk = rootPart and rootPart.Position; if not lastPositionBeforeAfk then warn("AFK Sequence cancelled: Could not get player position."); isAfkSequenceActive = false; return end; stopAllFarms(); teleportToRedLabelStorage(); task.wait(1); startForwardLoop(); task.wait(10); stopLoop(); task.wait(0.5); if character then character:PivotTo(CFrame.new(lastPositionBeforeAfk)) end; task.wait(1); if wasFarmingGrass then isGrassFarmEnabled = true; grassFarmButton.Text = "หยุดฟามหญ้า"; grassFarmButton.BackgroundColor3 = fantasyColors.StopRed elseif wasFarmingOre then isOreFarmEnabled = true; oreFarmButton.Text = "หยุดฟามแร่"; oreFarmButton.BackgroundColor3 = fantasyColors.StopRed end; isAfkSequenceActive = false end
 local areUIsVisible = true
-local function toggleAllUIs() areUIsVisible = not areUIsVisible; mainFrame.Visible = areUIsVisible; loopMainFrame.Visible = areUIsVisible; fantasyFarmFrame.Visible = areUIsVisible end
+local function toggleAllUIs() areUIsVisible = not areUIsVisible; mainFrame.Visible = areUIsVisible; loopMainFrame.Visible = areUIsVisible; fantasyFarmFrame.Visible = areUIsVisible; playerTeleportFrame.Visible = areUIsVisible end
+local function togglePlayerListUI() playerTeleportFrame.Visible = not playerTeleportFrame.Visible end
 
 -- ###################################################################
 -- ## SECTION 6: EVENT CONNECTIONS
@@ -186,6 +250,7 @@ redLabelButton.MouseButton1Click:Connect(teleportToRedLabel)
 worldMarketButton.MouseButton1Click:Connect(teleportToWorldMarket)
 grassButton.MouseButton1Click:Connect(teleportToGrass)
 oreMiningButton.MouseButton1Click:Connect(teleportToOreMining)
+playerListToggleButton.MouseButton1Click:Connect(togglePlayerListUI)
 grassFarmButton.MouseButton1Click:Connect(function() local wasEnabled=isGrassFarmEnabled; stopAllFarms(); if not wasEnabled then isGrassFarmEnabled=true; grassFarmButton.Text="หยุดฟามหญ้า"; grassFarmButton.BackgroundColor3=fantasyColors.StopRed end end)
 oreFarmButton.MouseButton1Click:Connect(function() local wasEnabled=isOreFarmEnabled; stopAllFarms(); if not wasEnabled then isOreFarmEnabled=true; oreFarmButton.Text="หยุดฟามแร่"; oreFarmButton.BackgroundColor3=fantasyColors.StopRed end end)
 copyCoordsButton.MouseButton1Click:Connect(function() local r=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") if r then local p=r.Position; local cs=string.format("%.0f, %.0f, %.0f",p.X,p.Y,p.Z); local s,m=pcall(function()UserInputService:SetClipboardAsync(cs)end); if s then local ot=copyCoordsButton.Text; copyCoordsButton.Text="Copied!"; task.wait(1.5); copyCoordsButton.Text=ot else warn("Clipboard failed:",m) end end end)
@@ -204,9 +269,16 @@ economyFarmButton.MouseButton1Click:Connect(toggleEconomyFarm)
 ff_titleBar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isFantasyFarmDragging = true; ff_dragStart = input.Position; ff_startPos = fantasyFarmFrame.Position end end)
 ff_titleBar.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isFantasyFarmDragging = false end end)
 
+-- Player Teleport Connections
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+Workspace.ChildAdded:Connect(updatePlayerList)
+Workspace.ChildRemoved:Connect(updatePlayerList)
+
 -- Master & System Connections
 masterToggleButton.MouseButton1Click:Connect(toggleAllUIs)
 locListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() locationsFrame.CanvasSize=UDim2.fromOffset(0,locListLayout.AbsoluteContentSize.Y) end)
+playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() playerListContentFrame.CanvasSize = UDim2.fromOffset(0, playerListLayout.AbsoluteContentSize.Y) end)
 UserInputService.InputChanged:Connect(function(input) if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isFantasyFarmDragging then local delta = input.Position - ff_dragStart; fantasyFarmFrame.Position = UDim2.new(ff_startPos.X.Scale, ff_startPos.X.Offset + delta.X, ff_startPos.Y.Scale, ff_startPos.Y.Offset + delta.Y) end end)
 RunService.Heartbeat:Connect(function(dt)
 	if not mainFrame.Visible then return end
@@ -223,4 +295,6 @@ end)
 -- ## SECTION 7: INITIALIZATION
 -- ###################################################################
 updateUIForSelection()
-print("AKB Master UI (v3.0) Loaded Successfully.")
+updatePlayerList()
+print("AKB Master UI (v4.0 - Merged) Loaded Successfully.")
+
