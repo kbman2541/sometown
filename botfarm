@@ -1,16 +1,15 @@
 --[[
     =============================================
-    -- Combined Control & Teleport UI Script -- (V2 - Stabilized)
+    -- Combined Control & Teleport UI Script -- (V3 - Fixed)
     =============================================
     This script merges the "AKB Coordinate UI" and the "Player Teleport UI".
     It provides a single, draggable UI with two tabs:
-    1. Controls: For coordinate teleport, farming, buying, and selling.
+    1. Controls: For coordinate teleport, farming, and buying.
     2. Players: For listing and teleporting to other players' objects in workspace.Character.
 
-    Stability Improvements:
-    - Safely finds farmable objects instead of using hardcoded paths.
-    - Verifies character and NetworkEvent exist before performing actions.
-    - Modernized coroutine handling for the farm loop.
+    Changes in this version:
+    - Fixed the window collapse functionality.
+    - Removed the ore selling system as requested.
 
     Setup: Place this script in StarterPlayer > StarterPlayerScripts.
 ]]
@@ -136,7 +135,7 @@ local function createUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
     
     -- Main Draggable Frame
-    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320); ControlPanelFrame.Position = UDim2.new(0.5, -125, 0.5, -160); ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
+    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; ControlPanelFrame.Size = UDim2.new(0, 250, 0, 280); ControlPanelFrame.Position = UDim2.new(0.5, -125, 0.5, -140); ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
     local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
 
     -- Title Bar
@@ -166,8 +165,10 @@ local function createUI()
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
     local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local SellButton = Instance.new("TextButton"); SellButton.Name = "SellButton"; SellButton.Size = UDim2.new(1, -20, 0, 30); SellButton.Position = UDim2.new(0, 10, 0, 160); SellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); SellButton.Font = Enum.Font.SourceSansBold; SellButton.Text = "ขายแร่"; SellButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellButton.TextSize = 16; SellButton.Parent = ControlsContentFrame
-    local UICorner_SellBtn = Instance.new("UICorner", SellButton); UICorner_SellBtn.CornerRadius = UDim.new(0, 6)
+    
+    -- [[ REMOVED SELL BUTTON ]]
+    -- local SellButton = Instance.new("TextButton"); SellButton.Name = "SellButton"; SellButton.Size = UDim2.new(1, -20, 0, 30); SellButton.Position = UDim2.new(0, 10, 0, 160); SellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); SellButton.Font = Enum.Font.SourceSansBold; SellButton.Text = "ขายแร่"; SellButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellButton.TextSize = 16; SellButton.Parent = ControlsContentFrame
+    -- local UICorner_SellBtn = Instance.new("UICorner", SellButton); UICorner_SellBtn.CornerRadius = UDim.new(0, 6)
     
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
@@ -181,7 +182,7 @@ local function createUI()
         TeleportButton = TeleportButton,
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
-        SellButton = SellButton,
+        -- SellButton is removed
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
         ControlsContentFrame = ControlsContentFrame,
@@ -194,7 +195,7 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 320)
+local originalSize = UDim2.new(0, 250, 0, 280) -- Adjusted original size after removing a button
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local autoProcessCoroutine = nil
@@ -322,8 +323,6 @@ local function toggleOreFarmLoop(farmButton)
     else
         farmButton.Text = "ฟามแร่"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        -- The coroutine will stop by itself because isOreFarmLoopActive is false
-        -- No need for coroutine.close(), which is deprecated
         if autoProcessCoroutine then
             autoProcessCoroutine = nil
         end
@@ -342,14 +341,15 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
-local function sellRock()
-    if not NetworkEvent then warn("NetworkEvent not available for sellRock") return end
-    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart then return end
-    currentRootPart.CFrame = CFrame.new(2855, 17, 2108)
-    task.wait(0.2)
-    NetworkEvent:FireServer("fire", nil, "Economy", "Rock", 100)
-end
+-- [[ REMOVED SELL FUNCTION ]]
+-- local function sellRock()
+--     if not NetworkEvent then warn("NetworkEvent not available for sellRock") return end
+--     local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+--     if not currentRootPart then return end
+--     currentRootPart.CFrame = CFrame.new(2855, 17, 2108)
+--     task.wait(0.2)
+--     NetworkEvent:FireServer("fire", nil, "Economy", "Rock", 100)
+-- end
 
 -- =============================================
 -- Main Execution & Event Connections
@@ -381,10 +381,17 @@ end)
 local function toggleCollapse()
     isCollapsed = not isCollapsed
     local targetSize = isCollapsed and UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 30) or originalSize
-    for _, child in pairs(ControlPanelFrame:GetChildren()) do
-        if child.Name ~= "TitleBar" then child.Visible = not isCollapsed end
-    end
-    UIElements.CollapseButton.Text = isCollapsed and "[+]" or "–"
+
+    -- Find the main content containers
+    local contentContainer = ControlPanelFrame:FindFirstChild("ContentContainer")
+    local tabContainer = ControlPanelFrame:FindFirstChild("TabContainer")
+
+    -- Toggle their visibility
+    if contentContainer then contentContainer.Visible = not isCollapsed end
+    if tabContainer then tabContainer.Visible = not isCollapsed end
+
+    -- Update button text and play tween
+    UIElements.CollapseButton.Text = isCollapsed and "+" or "–"
     TweenService:Create(ControlPanelFrame, tweenInfo, {Size = targetSize}):Play()
 end
 
@@ -404,7 +411,8 @@ UIElements.PlayersTabButton.MouseButton1Click:Connect(function() switchTab("Play
 UIElements.TeleportButton.MouseButton1Click:Connect(function() teleportPlayer(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
-UIElements.SellButton.MouseButton1Click:Connect(sellRock)
+-- [[ REMOVED SELL BUTTON CONNECTION ]]
+-- UIElements.SellButton.MouseButton1Click:Connect(sellRock)
 
 -- Auto-Eat/Drink Loop
 if NetworkEvent then
@@ -445,5 +453,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Stabilized Control Panel UI Loaded Successfully. 🛠️")
-
+print("Stabilized Control Panel UI (V3) Loaded Successfully. 🛠️")
