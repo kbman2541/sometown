@@ -1,11 +1,10 @@
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local PathfindingService = game:GetService("PathfindingService") -- เพิ่ม Service สำหรับคำนวณเส้นทาง
+local PathfindingService = game:GetService("PathfindingService")
 
 -- Ensure this script only runs on the client
 if not RunService:IsClient() then
@@ -211,6 +210,7 @@ local function getObjectsToTrack()
     return trackList
 end
 
+-- [[ แก้ไข ]] ฟังก์ชันเดินไปหาแร่ให้ใช้ Pathfinding ที่ฉลาดขึ้น
 local function findAndWalkToClosest()
     local character = LocalPlayer.Character
     if not character then return end
@@ -238,8 +238,44 @@ local function findAndWalkToClosest()
     end
 
     if closestObject then
-        print("Walking to closest object:", closestObject:GetFullName())
-        humanoid:MoveTo(closestObject.WorldPivot.Position)
+        print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
+        
+        local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+        local path = PathfindingService:CreatePath(agentParameters)
+        
+        local success, errorMessage = pcall(function()
+            path:ComputeAsync(rootPart.Position, closestObject.WorldPivot.Position)
+        end)
+
+        if success and path.Status == Enum.PathStatus.Success then
+            print("คำนวณเส้นทางสำเร็จ กำลังเดินตามจุด...")
+            local waypoints = path:GetWaypoints()
+            
+            local pathBlockedConnection
+            local function onPathBlocked(blockedWaypointIndex)
+                if blockedWaypointIndex < #waypoints then
+                    print("เส้นทางถูกบล็อกที่จุด " .. blockedWaypointIndex .. ". กำลังคำนวณใหม่...")
+                    if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                    findAndWalkToClosest()
+                end
+            end
+            pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+
+            for i, waypoint in ipairs(waypoints) do
+                if not isOreFarmLoopActive then
+                    print("Farming stopped mid-path. Aborting walk.")
+                    break
+                end
+                humanoid:MoveTo(waypoint.Position)
+                humanoid.MoveToFinished:Wait()
+            end
+            
+            if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+            print("Reached destination or path ended.")
+        else
+            warn("การคำนวณเส้นทางหาแร่ล้มเหลว: ", errorMessage or "No viable path.", "ใช้การเดินแบบตรงแทน")
+            humanoid:MoveTo(closestObject.WorldPivot.Position)
+        end
     else
         warn("Could not find any valid objects to walk to.")
     end
@@ -268,16 +304,16 @@ local function teleportPlayer(inputBox)
     end
 end
 
--- Farm Step
+-- [[ แก้ไข ]] Farm Step
 local function executeFarmStep()
     local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not currentRootPart or not isOreFarmLoopActive then return end
-    currentRootPart.CFrame = CFrame.new(-301,38,-2718)
+    currentRootPart.CFrame = CFrame.new(-339, 33, -2713) -- เปลี่ยนพิกัด
     task.wait(0.1)
     findAndWalkToClosest()
 end
 
--- Auto Process Loop
+-- [[ แก้ไข ]] Auto Process Loop
 local function startAutoProcessLoop()
     while isOreFarmLoopActive do
         task.wait(180)
@@ -285,11 +321,15 @@ local function startAutoProcessLoop()
         if LocalPlayer.Character and NetworkEvent then
             print("Auto-processing Rock...")
             NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+            
+            task.wait(1) -- รอสักครู่หลัง Process
+            print("Processing finished. Resetting farm position...")
+            executeFarmStep() -- วาปและหาแร่ใหม่หลังจาก Process
         end
     end
 end
 
--- Toggle Farm Loop
+-- [[ แก้ไข ]] Toggle Farm Loop
 local function toggleOreFarmLoop(farmButton)
     isOreFarmLoopActive = not isOreFarmLoopActive
     if isOreFarmLoopActive then
@@ -298,15 +338,20 @@ local function toggleOreFarmLoop(farmButton)
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if currentRootPart then lastPosition = currentRootPart.Position end
         timeStationary = 0
-        executeFarmStep()
+        
+        -- เริ่มทำงาน
+        executeFarmStep() 
+        
+        -- เริ่ม Coroutine สำหรับ Process
         autoProcessCoroutine = coroutine.create(startAutoProcessLoop)
         coroutine.resume(autoProcessCoroutine)
+        
     else
         farmButton.Text = "ฟามแร่"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        if autoProcessCoroutine then
-            autoProcessCoroutine = nil
-        end
+        
+        -- หยุด Coroutine
+        autoProcessCoroutine = nil
     end
 end
 
@@ -322,7 +367,7 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- [[ UPDATED FUNCTION: Walk to Sell Point with Pathfinding ]]
+-- [[ แก้ไข ]] ฟังก์ชันเดินไปจุดขายให้ฉลาดขึ้น
 local function walkToSellPoint()
     local character = LocalPlayer.Character
     if not character then return end
@@ -332,27 +377,36 @@ local function walkToSellPoint()
 
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
     
-    -- สร้าง Path object
-    local path = PathfindingService:CreatePath()
+    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+    local path = PathfindingService:CreatePath(agentParameters)
 
-    -- คำนวณเส้นทางจากจุดเริ่มต้นไปยังปลายทาง
     local success, errorMessage = pcall(function()
         path:ComputeAsync(rootPart.Position, destination)
     end)
 
     if success and path.Status == Enum.PathStatus.Success then
-        print("คำนวณเส้นทางสำเร็จ กำลังเดินตามจุด Waypoints...")
+        print("คำนวณเส้นทางไปยังจุดขายสำเร็จ กำลังเดินตามจุด...")
         local waypoints = path:GetWaypoints()
+        
+        local pathBlockedConnection
+        local function onPathBlocked(blockedWaypointIndex)
+            if blockedWaypointIndex < #waypoints then
+                print("เส้นทางไปยังจุดขายถูกบล็อก กำลังคำนวณใหม่...")
+                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                walkToSellPoint() -- Restart the walk
+            end
+        end
+        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
 
-        -- เดินตามจุด Waypoints ที่คำนวณได้
         for _, waypoint in ipairs(waypoints) do
             humanoid:MoveTo(waypoint.Position)
             humanoid.MoveToFinished:Wait()
         end
-        print("เดินถึงจุดขายเรียบร้อยแล้ว")
+        
+        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+        print("ถึงจุดขายเรียบร้อยแล้ว")
     else
-        warn("การคำนวณเส้นทางล้มเหลว: ", errorMessage or "ไม่พบเส้นทาง")
-        -- หากคำนวณเส้นทางไม่สำเร็จ ให้เดินตรงไปเป็นทางเลือกสุดท้าย
+        warn("การคำนวณเส้นทางไปจุดขายล้มเหลว: ", errorMessage or "No path found.", "ใช้การเดินแบบตรงแทน")
         humanoid:MoveTo(destination)
     end
 end
@@ -468,4 +522,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Stabilized Control Panel UI (V5 - Pathfinding) Loaded Successfully. 🛠️")
+print("Stabilized Control Panel UI (V8 - Smart Pathfinding) Loaded Successfully. 🛠️")
+
