@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local inventoryFolder = LocalPlayer:WaitForChild("Inventory") -- [[ เพิ่มใหม่ ]]
+local inventoryFolder = LocalPlayer:WaitForChild("Inventory")
 local NetworkEvent
 
 -- Safely get NetworkEvent
@@ -182,7 +182,8 @@ local isCollapsed = false
 local originalSize = UDim2.new(0, 250, 0, 320)
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
-local inventoryConnection = nil -- [[ แก้ไข ]]
+local inventoryConnection = nil
+local isWaitingForRockToClear = false
 local lastPosition = Vector3.new()
 local timeStationary = 0
 local antiStuckThreshold = 5
@@ -211,14 +212,14 @@ local function getObjectsToTrack()
     return trackList
 end
 
--- [[ แก้ไข ]] ฟังก์ชันเดินไปหาแร่ให้ใช้ Pathfinding ที่ฉลาดขึ้น
+-- ฟังก์ชันเดินไปหาแร่ให้ใช้ Pathfinding ที่ฉลาดขึ้น
 local function findAndWalkToClosest()
     local character = LocalPlayer.Character
     if not character then return end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     
-    if not (humanoid and rootPart and humanoid.Health > 0) then return end
+    if not (humanoid and rootPart and humanoid.Health > 0 and isOreFarmLoopActive) then return end
 
     task.wait(0.5)
 
@@ -305,60 +306,93 @@ local function teleportPlayer(inputBox)
     end
 end
 
--- Farm Step
-local function executeFarmStep()
+-- [[ เพิ่มใหม่ ]] พิกัดจุดฟามเริ่มต้น
+local initialFarmPosition = CFrame.new(-339, 33, -2713)
+-- [[ เพิ่มใหม่ ]] พิกัดจุดฟามหลัง Process
+local postProcessFarmPosition = CFrame.new(-332, 35, -2680)
+
+-- [[ แก้ไข ]] Farm Step สำหรับการฟามต่ออัตโนมัติ
+local function executeResumeFarmStep()
     local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not currentRootPart or not isOreFarmLoopActive then return end
-    currentRootPart.CFrame = CFrame.new(-339, 33, -2713) -- เปลี่ยนพิกัด
+    currentRootPart.CFrame = postProcessFarmPosition -- ใช้พิกัดหลัง Process
     task.wait(0.1)
     findAndWalkToClosest()
 end
 
--- [[ เพิ่มใหม่ ]] ฟังก์ชันสำหรับ Process และวาปกลับ
-local function processAndReset()
-    if not isOreFarmLoopActive then return end
-    print("Rock count reached 100. Auto-processing...")
-    NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-    task.wait(1)
-    print("Processing finished. Resetting farm position...")
-    executeFarmStep()
-end
+-- [[ แก้ไข ]] ฟังก์ชันสำหรับตรวจสอบการเปลี่ยนแปลงใน Inventory
+local function onInventoryChanged(attributeName, farmButton)
+    if not inventoryFolder then return end
+    
+    local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
--- [[ เพิ่มใหม่ ]] ฟังก์ชันสำหรับตรวจสอบการเปลี่ยนแปลงใน Inventory
-local function onInventoryChanged(attributeName)
-    if attributeName == "Rock" then
-        local rockCount = inventoryFolder:GetAttribute("Rock")
-        if rockCount and rockCount >= 100 then
-            processAndReset()
+    -- เงื่อนไขที่ 1: ถ้ากำลังฟามอยู่ และหินครบ 100 ให้เริ่ม Process
+    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
+        isWaitingForRockToClear = true
+        isOreFarmLoopActive = false -- หยุดการหาแร่ชั่วคราว
+
+        farmButton.Text = "รอ Rock หมด..."
+        farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        
+        print("Rock count reached 100. Auto-processing...")
+        NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+        
+        task.wait(1)
+        
+        print("Processing finished. Teleporting and waiting for inventory to clear...")
+        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if currentRootPart then
+            currentRootPart.CFrame = postProcessFarmPosition -- วาปไปจุดเริ่มต้นใหม่หลัง Process
         end
+        
+    -- เงื่อนไขที่ 2: ถ้ากำลังรอหินหมด และหินกลายเป็น 0 ให้กลับไปฟามต่อ
+    elseif isWaitingForRockToClear and rockCount == 0 then
+        print("Rock inventory cleared. Resuming farming...")
+        isWaitingForRockToClear = false
+        isOreFarmLoopActive = true -- กลับมาฟามต่อ
+
+        farmButton.Text = "หยุดฟามแร่"
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        
+        executeResumeFarmStep() -- เริ่มหาแร่ ณ จุดหลัง Process
     end
 end
+
 
 -- [[ แก้ไข ]] Toggle Farm Loop
 local function toggleOreFarmLoop(farmButton)
     isOreFarmLoopActive = not isOreFarmLoopActive
+    
     if isOreFarmLoopActive then
+        isWaitingForRockToClear = false
         farmButton.Text = "หยุดฟามแร่"
         farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if currentRootPart then lastPosition = currentRootPart.Position end
+        if currentRootPart then
+            lastPosition = currentRootPart.Position
+            -- วาปไปยังจุดเริ่มต้นเมื่อกดปุ่มฟามครั้งแรก
+            print("Starting farm manually. Teleporting to initial position...")
+            currentRootPart.CFrame = initialFarmPosition
+            task.wait(0.1)
+            findAndWalkToClosest()
+        end
         timeStationary = 0
         
-        executeFarmStep()
+        if not inventoryConnection then
+            inventoryConnection = inventoryFolder.AttributeChanged:Connect(function(attributeName)
+                onInventoryChanged(attributeName, farmButton)
+            end)
+        end
         
-        inventoryConnection = inventoryFolder.AttributeChanged:Connect(onInventoryChanged)
-        
+        -- ตรวจสอบครั้งแรกเผื่อมีหินเกิน 100 อยู่แล้ว
         task.spawn(function()
-            task.wait(1)
-            if isOreFarmLoopActive then
-                local rockCount = inventoryFolder:GetAttribute("Rock")
-                if rockCount and rockCount >= 100 then
-                    processAndReset()
-                end
-            end
+            task.wait(0.5)
+            onInventoryChanged("Rock", farmButton)
         end)
         
     else
+        isWaitingForRockToClear = false
         farmButton.Text = "ฟามแร่"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
@@ -381,7 +415,7 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- [[ แก้ไข ]] ฟังก์ชันเดินไปจุดขายให้ฉลาดขึ้น
+-- ฟังก์ชันเดินไปจุดขายให้ฉลาดขึ้น
 local function walkToSellPoint()
     local character = LocalPlayer.Character
     if not character then return end
@@ -536,5 +570,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Stabilized Control Panel UI (V9 - Inventory Trigger) Loaded Successfully. 🛠️")
+print("Stabilized Control Panel UI (V11 - Dual Position) Loaded Successfully. 🛠️")
 
