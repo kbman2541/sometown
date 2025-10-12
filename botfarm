@@ -312,7 +312,7 @@ local function teleportPlayer(inputBox)
 end
 
 -- [[ เพิ่มใหม่ ]] พิกัดจุดฟามเริ่มต้น
-local initialFarmPosition = CFrame.new(-339, 33, -2713)
+local initialFarmPosition = CFrame.new(-339, 40, -2713)
 -- [[ เพิ่มใหม่ ]] พิกัดจุดฟามหลัง Process
 local postProcessFarmPosition = CFrame.new(-332, 35, -2680)
 
