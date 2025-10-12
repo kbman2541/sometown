@@ -118,7 +118,7 @@ local function createUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
     
     -- Main Draggable Frame
-    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320); ControlPanelFrame.Position = UDim2.new(0.5, -125, 0.5, -160); ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
+    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; ControlPanelFrame.Size = UDim2.new(0, 250, 0, 360); ControlPanelFrame.Position = UDim2.new(0.5, -125, 0.5, -180); ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
     local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
 
     -- Title Bar
@@ -150,6 +150,8 @@ local function createUI()
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
     local WalkToSellButton = Instance.new("TextButton"); WalkToSellButton.Name = "WalkToSellButton"; WalkToSellButton.Size = UDim2.new(1, -20, 0, 30); WalkToSellButton.Position = UDim2.new(0, 10, 0, 160); WalkToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WalkToSellButton.Font = Enum.Font.SourceSansBold; WalkToSellButton.Text = "เดินไปจุดขาย"; WalkToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToSellButton.TextSize = 16; WalkToSellButton.Parent = ControlsContentFrame
     local UICorner_WalkSellBtn = Instance.new("UICorner", WalkToSellButton); UICorner_WalkSellBtn.CornerRadius = UDim.new(0, 6)
+    local NoclipButton = Instance.new("TextButton"); NoclipButton.Name = "NoclipButton"; NoclipButton.Size = UDim2.new(1, -20, 0, 30); NoclipButton.Position = UDim2.new(0, 10, 0, 200); NoclipButton.BackgroundColor3 = Color3.fromRGB(120, 120, 120); NoclipButton.Font = Enum.Font.SourceSansBold; NoclipButton.Text = "เดินทะลุ (off)"; NoclipButton.TextColor3 = Color3.fromRGB(255, 255, 255); NoclipButton.TextSize = 16; NoclipButton.Parent = ControlsContentFrame
+    local UICorner_NoclipBtn = Instance.new("UICorner", NoclipButton); UICorner_NoclipBtn.CornerRadius = UDim.new(0, 6)
     
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
@@ -166,6 +168,7 @@ local function createUI()
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
         WalkToSellButton = WalkToSellButton,
+        NoclipButton = NoclipButton,
         WarpToKealohaButton = WarpToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
@@ -179,7 +182,7 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 320)
+local originalSize = UDim2.new(0, 250, 0, 360)
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local inventoryConnection = nil
@@ -187,6 +190,8 @@ local isWaitingForRockToClear = false
 local lastPosition = Vector3.new()
 local timeStationary = 0
 local antiStuckThreshold = 5
+local isNoclipActive = false
+local noclipConnection = nil
 
 -- New function to safely create the list of objects to track
 local function getObjectsToTrack()
@@ -403,6 +408,50 @@ local function toggleOreFarmLoop(farmButton)
     end
 end
 
+-- [[ เพิ่มใหม่ ]] ฟังก์ชันเปิด/ปิดการเดินทะลุ
+local BODY_PARTS_SET = {
+    Head = true, Torso = true, UpperTorso = true, LowerTorso = true, HumanoidRootPart = true, 
+    LeftUpperArm = true, RightUpperArm = true, LeftLowerArm = true, RightLowerArm = true, 
+    LeftHand = true, RightHand = true, LeftUpperLeg = true, RightUpperLeg = true, 
+    LeftLowerLeg = true, RightLowerLeg = true, LeftFoot = true, RightFoot = true
+}
+local function toggleNoclip(noclipButton)
+    isNoclipActive = not isNoclipActive
+    
+    if isNoclipActive then
+        noclipButton.Text = "เดินทะลุ (on)"
+        noclipButton.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
+        
+        noclipConnection = RunService.Stepped:Connect(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    else
+        noclipButton.Text = "เดินทะลุ (off)"
+        noclipButton.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+        
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        
+        -- คืนค่า CanCollide ให้กับส่วนหลักของตัวละคร
+        local char = LocalPlayer.Character
+        if not char then return end
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and BODY_PARTS_SET[part.Name] then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
 -- Buy/Sell/Walk Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
@@ -530,6 +579,10 @@ UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
 UIElements.WalkToSellButton.MouseButton1Click:Connect(walkToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
+UIElements.NoclipButton.MouseButton1Click:Connect(function() toggleNoclip(UIElements.NoclipButton) end)
+
+-- [[ เพิ่มใหม่ ]] เปิดใช้งาน Noclip ตอนเริ่มเกม
+toggleNoclip(UIElements.NoclipButton)
 
 -- Auto-Eat/Drink Loop
 if NetworkEvent then
@@ -570,5 +623,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Stabilized Control Panel UI (V11 - Dual Position) Loaded Successfully. 🛠️")
+print("Stabilized Control Panel UI (V12 - Noclip Added) Loaded Successfully. 🛠️")
 
