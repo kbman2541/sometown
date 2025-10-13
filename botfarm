@@ -1,17 +1,16 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.0 (Responsive Update)
+    Version: 3.1 (Anti-Stuck at Ore Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.0:
-    - Main control panel is now responsive and scales with screen size.
-    - Added the ability to toggle the main control panel's visibility by pressing the 'F' key.
-    - The Diamond counter UI remains fixed in size and position, and is always visible.
+    Update v3.1:
+    - Added an ore-specific anti-stuck feature. If the player is stationary near a target ore
+      for more than 10 seconds, the script will automatically find the next closest ore.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -303,6 +302,11 @@ local isWaitingForRockToClear = false
 local lastPosition = Vector3.new()
 local timeStationary = 0
 local antiStuckThreshold = 5
+-- [NEW] State variables for ore-specific anti-stuck
+local currentTargetOre = nil
+local timeAtOreStationary = 0
+local antiStuckAtOreThreshold = 10 -- User-defined 10 seconds
+local distanceToOreThreshold = 3   -- User-defined 3 studs distance
 
 -- [MERGED] Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
@@ -352,7 +356,7 @@ local function getObjectsToTrack()
 end
 
 -- Pathfinding walk function
-local function findAndWalkToClosest()
+local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added parameter
     local character = LocalPlayer.Character
     if not character then return end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -365,12 +369,14 @@ local function findAndWalkToClosest()
     local objectsToTrack = getObjectsToTrack()
     if #objectsToTrack == 0 then
         warn("No objects to track were found. Aborting walk.")
+		currentTargetOre = nil -- [NEW] Reset target ore
         return
     end
 
     local closestObject, minDistance = nil, math.huge
     for _, obj in ipairs(objectsToTrack) do
-        if obj and obj.Parent then
+        -- [MODIFIED] Check if the object is valid and not the one to exclude
+        if obj and obj.Parent and obj ~= oreToExclude then
             local dist = (rootPart.Position - obj.WorldPivot.Position).Magnitude
             if dist < minDistance then
                 minDistance, closestObject = dist, obj
@@ -379,6 +385,7 @@ local function findAndWalkToClosest()
     end
 
     if closestObject then
+		currentTargetOre = closestObject -- [NEW] Set the new target ore
         print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
         
         local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
@@ -397,7 +404,7 @@ local function findAndWalkToClosest()
                 if blockedWaypointIndex < #waypoints then
                     print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
                     if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                    findAndWalkToClosest()
+                    findAndWalkToClosestOre(nil)
                 end
             end
             pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
@@ -418,7 +425,8 @@ local function findAndWalkToClosest()
             humanoid:MoveTo(closestObject.WorldPivot.Position)
         end
     else
-        warn("Could not find any valid objects to walk to.")
+		currentTargetOre = nil -- [NEW] Reset if no object is found
+        warn("Could not find any valid objects to walk to (excluding current target).")
     end
 end
 
@@ -455,7 +463,7 @@ local function executeResumeFarmStep()
     if not currentRootPart or not isOreFarmLoopActive then return end
     currentRootPart.CFrame = postProcessFarmPosition
     task.wait(0.1)
-    findAndWalkToClosest()
+    findAndWalkToClosestOre(nil)
 end
 
 -- Inventory change handler for farming
@@ -528,7 +536,7 @@ local function toggleOreFarmLoop(farmButton)
             print("Starting farm manually. Teleporting to initial position...")
             currentRootPart.CFrame = initialFarmPosition
             task.wait(0.1)
-            findAndWalkToClosest()
+            findAndWalkToClosestOre(nil)
         end
         timeStationary = 0
         
@@ -640,17 +648,45 @@ RunService.RenderStepped:Connect(function(deltaTime)
         UIElements.CoordinateLabel.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", pos.X, pos.Y, pos.Z)
     end
     if not isOreFarmLoopActive or not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return end
+    
     local currentPos = LocalPlayer.Character.HumanoidRootPart.Position
-    if (currentPos - lastPosition).Magnitude < 0.5 then
+    local isStationary = (currentPos - lastPosition).Magnitude < 0.5
+
+    -- General Anti-Stuck Logic
+    if isStationary then
         timeStationary += deltaTime
     else
         timeStationary = 0
         lastPosition = currentPos
     end
+    
     if timeStationary >= antiStuckThreshold then
-        print("Anti-Stuck Triggered. Re-pathing...")
-        findAndWalkToClosest()
+        print("Anti-Stuck Triggered (General). Re-pathing...")
+        findAndWalkToClosestOre(nil) -- [MODIFIED] Call new function
         timeStationary = 0
+        timeAtOreStationary = 0 -- [NEW] Reset ore timer as well
+    end
+
+    -- [NEW] Ore-specific Anti-Stuck Logic
+    if currentTargetOre and currentTargetOre.Parent then
+        local distToTarget = (currentPos - currentTargetOre.WorldPivot.Position).Magnitude
+
+        if isStationary and distToTarget <= distanceToOreThreshold then
+            timeAtOreStationary += deltaTime
+            
+            if timeAtOreStationary >= antiStuckAtOreThreshold then
+                print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
+                findAndWalkToClosestOre(currentTargetOre) -- Find next ore, excluding the current one
+                timeStationary = 0 -- Reset both timers
+                timeAtOreStationary = 0
+            end
+        else
+            -- If player moves or is far from the ore, reset the ore-specific timer
+            timeAtOreStationary = 0
+        end
+    else
+        -- If there's no target ore, this timer should be zero
+        timeAtOreStationary = 0
     end
 end)
 
@@ -740,4 +776,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.0 Responsive] 🛠️💎")
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.1 Anti-Stuck] 🛠️💎")
+
