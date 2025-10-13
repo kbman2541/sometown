@@ -1,3 +1,22 @@
+--[[
+    Merged Control Panel & UI Script
+    Creator: Gemini
+    Version: 2.0
+
+    Description:
+    This script provides a comprehensive control panel for players, including teleportation,
+    automated farming, and player interaction. It also includes a separate, dedicated UI 
+    element to display the player's "Diamond" count from their Inventory attributes.
+
+    Installation:
+    Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
+]]
+
+-- =============================================
+-- Settings
+-- =============================================
+local DIAMOND_ATTRIBUTE_NAME = "Diamond" -- Attribute to display on the counter UI.
+
 -- =============================================
 -- Service Definitions
 -- =============================================
@@ -43,6 +62,7 @@ pcall(function()
     if PlayerGui:FindFirstChild("CoordinateUI") then PlayerGui.CoordinateUI:Destroy() end
     if PlayerGui:FindFirstChild("PlayerTeleportGui") then PlayerGui.PlayerTeleportGui:Destroy() end
     if PlayerGui:FindFirstChild("CombinedControlUI") then PlayerGui.CombinedControlUI:Destroy() end
+    if PlayerGui:FindFirstChild("ItemCounterGui") then PlayerGui.ItemCounterGui:Destroy() end -- Cleanup for diamond counter
 end)
 
 -- =============================================
@@ -124,9 +144,77 @@ local function updatePlayerList()
 end
 
 -- =============================================
--- UI Creation (Merged)
+-- UI Creation Functions
 -- =============================================
-local function createUI()
+
+-- [MERGED] Diamond Counter UI Creation
+local function createDiamondCounterUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ItemCounterGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local shadowFrame = Instance.new("Frame")
+    shadowFrame.Name = "ShadowFrame"
+    shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    shadowFrame.BackgroundTransparency = 0.6
+    shadowFrame.BorderSizePixel = 0
+    shadowFrame.Position = UDim2.new(0, 15 + 3, 0, 15 + 3) 
+    shadowFrame.Size = UDim2.new(0, 220, 0, 60)
+    shadowFrame.ZIndex = 1
+    shadowFrame.Parent = screenGui
+    
+    local shadowCorner = Instance.new("UICorner")
+    shadowCorner.CornerRadius = UDim.new(0, 12)
+    shadowCorner.Parent = shadowFrame
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "CounterFrame"
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
+    mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
+    mainFrame.BorderSizePixel = 1
+    mainFrame.Position = UDim2.new(0, 15, 0, 15)
+    mainFrame.Size = UDim2.new(0, 220, 0, 60)
+    mainFrame.ZIndex = 2
+    mainFrame.Parent = screenGui
+    
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 12)
+    uiCorner.Parent = mainFrame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
+    titleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 24
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Position = UDim2.new(0, 15, 0.5, 0)
+    titleLabel.Size = UDim2.new(1, -95, 0, 30)
+    titleLabel.AnchorPoint = Vector2.new(0, 0.5)
+    titleLabel.Parent = mainFrame
+    
+    local countLabel = Instance.new("TextLabel")
+    countLabel.Name = "Count"
+    countLabel.Text = "..."
+    countLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    countLabel.BackgroundTransparency = 1
+    countLabel.Font = Enum.Font.SourceSansBold
+    countLabel.TextSize = 28
+    countLabel.TextXAlignment = Enum.TextXAlignment.Right
+    countLabel.Position = UDim2.new(1, -15, 0.5, 0)
+    countLabel.Size = UDim2.new(0, 80, 0, 30)
+    countLabel.AnchorPoint = Vector2.new(1, 0.5)
+    countLabel.Parent = mainFrame
+    
+    screenGui.Parent = PlayerGui
+    
+    return countLabel
+end
+
+-- Control Panel UI Creation
+local function createControlPanelUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
     
     -- Main Draggable Frame
@@ -200,6 +288,29 @@ local lastPosition = Vector3.new()
 local timeStationary = 0
 local antiStuckThreshold = 5
 
+-- [MERGED] Logic for Diamond Counter
+local function setupDiamondCounter(countLabel)
+    if not inventoryFolder then 
+        warn("Diamond Counter: Inventory folder not found!")
+        return
+    end
+
+    local function updateAttributeCount()
+        local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
+        countLabel.Text = tostring(amount)
+    end
+
+    updateAttributeCount() -- Initial update
+
+    inventoryFolder.AttributeChanged:Connect(function(attributeName)
+        if attributeName == DIAMOND_ATTRIBUTE_NAME then
+            updateAttributeCount()
+        end
+    end)
+    print("Diamond Counter UI logic initialized.")
+end
+
+
 -- New function to safely create the list of objects to track
 local function getObjectsToTrack()
     local trackList = {}
@@ -224,7 +335,7 @@ local function getObjectsToTrack()
     return trackList
 end
 
--- ฟังก์ชันเดินไปหาแร่ให้ใช้ Pathfinding ที่ฉลาดขึ้น
+-- Pathfinding walk function
 local function findAndWalkToClosest()
     local character = LocalPlayer.Character
     if not character then return end
@@ -262,13 +373,13 @@ local function findAndWalkToClosest()
         end)
 
         if success and path.Status == Enum.PathStatus.Success then
-            print("คำนวณเส้นทางสำเร็จ กำลังเดินตามจุด...")
+            print("Path calculated. Following waypoints...")
             local waypoints = path:GetWaypoints()
             
             local pathBlockedConnection
             local function onPathBlocked(blockedWaypointIndex)
                 if blockedWaypointIndex < #waypoints then
-                    print("เส้นทางถูกบล็อกที่จุด " .. blockedWaypointIndex .. ". กำลังคำนวณใหม่...")
+                    print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
                     if pathBlockedConnection then pathBlockedConnection:Disconnect() end
                     findAndWalkToClosest()
                 end
@@ -287,7 +398,7 @@ local function findAndWalkToClosest()
             if pathBlockedConnection then pathBlockedConnection:Disconnect() end
             print("Reached destination or path ended.")
         else
-            warn("การคำนวณเส้นทางหาแร่ล้มเหลว: ", errorMessage or "No viable path.", "ใช้การเดินแบบตรงแทน")
+            warn("Pathfinding to ore failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
             humanoid:MoveTo(closestObject.WorldPivot.Position)
         end
     else
@@ -318,64 +429,57 @@ local function teleportPlayer(inputBox)
     end
 end
 
--- พิกัดจุดฟามเริ่มต้น
+-- Farming coordinates
 local initialFarmPosition = CFrame.new(-339, 40, -2713)
--- พิกัดจุดฟามหลัง Process
 local postProcessFarmPosition = CFrame.new(-332, 35, -2680)
 
--- Farm Step สำหรับการฟามต่ออัตโนมัติ
+-- Farm Step for auto-resume
 local function executeResumeFarmStep()
     local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not currentRootPart or not isOreFarmLoopActive then return end
-    currentRootPart.CFrame = postProcessFarmPosition -- ใช้พิกัดหลัง Process
+    currentRootPart.CFrame = postProcessFarmPosition
     task.wait(0.1)
     findAndWalkToClosest()
 end
 
--- [[ ปรับปรุงตามคำขอ ]] ฟังก์ชันสำหรับตรวจสอบการเปลี่ยนแปลงใน Inventory
+-- Inventory change handler for farming
 local function onInventoryChanged(attributeName, farmButton)
     if not inventoryFolder then return end
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-    -- เงื่อนไขที่ 1: ถ้ากำลังฟามอยู่ และหินครบ 100 ให้เริ่ม Process
     if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
         isWaitingForRockToClear = true
-        isOreFarmLoopActive = false -- หยุดการหาแร่ชั่วคราว
+        isOreFarmLoopActive = false -- Pause farming
 
-        farmButton.Text = "รอ Rock หมด..."
+        farmButton.Text = "Waiting for Rock..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         
         print("Rock count reached 100. Cooldown for 2 seconds before warp.")
-        task.wait(2) -- << [NEW] เพิ่มคูลดาวน์ 2 วินาที
+        task.wait(2)
         
         print("Preparing to warp and process.")
         
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         
         if currentRootPart then
-            print("Player character found. Current position:", currentRootPart.Position)
             print("Warping to process point at:", postProcessFarmPosition.Position)
             
-            -- << [MODIFIED] เปลี่ยนลำดับ: วาปก่อนแล้วค่อย Process
-            currentRootPart.CFrame = postProcessFarmPosition -- วาปไปจุด Process
+            currentRootPart.CFrame = postProcessFarmPosition
             
             print("Teleport command issued. Waiting 4 seconds...")
-            task.wait(4) -- << [MODIFIED] รอ 4 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
+            task.wait(4)
             
-            print("Wait finished. Position after warp:", currentRootPart.Position)
-            print("Now sending 'Process' command to server...")
+            print("Wait finished. Sending 'Process' command to server...")
             NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         else
             warn("Could not find HumanoidRootPart to warp. Cannot process.")
         end
         
-    -- เงื่อนไขที่ 2: ถ้ากำลังรอหินหมด และหินกลายเป็น 0 ให้กลับไปฟามต่อ
     elseif isWaitingForRockToClear and rockCount == 0 then
         print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
-        task.wait(5) -- <<<< [แก้ไข] เพิ่มการรอ 5 วินาที
+        task.wait(5)
 
-        -- ตรวจสอบว่าผู้ใช้ยกเลิกระหว่างรอหรือไม่
         if not isWaitingForRockToClear then
             print("Farming was cancelled during the wait. Aborting resume.")
             return
@@ -383,12 +487,12 @@ local function onInventoryChanged(attributeName, farmButton)
         
         print("Resuming farming...")
         isWaitingForRockToClear = false
-        isOreFarmLoopActive = true -- กลับมาฟามต่อ
+        isOreFarmLoopActive = true -- Resume farming
 
-        farmButton.Text = "หยุดฟามแร่"
+        farmButton.Text = "Stop Farming"
         farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
         
-        executeResumeFarmStep() -- เริ่มหาแร่ ณ จุดหลัง Process
+        executeResumeFarmStep()
     end
 end
 
@@ -399,13 +503,12 @@ local function toggleOreFarmLoop(farmButton)
     
     if isOreFarmLoopActive then
         isWaitingForRockToClear = false
-        farmButton.Text = "หยุดฟามแร่"
+        farmButton.Text = "Stop Farming"
         farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
         
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if currentRootPart then
             lastPosition = currentRootPart.Position
-            -- วาปไปยังจุดเริ่มต้นเมื่อกดปุ่มฟามครั้งแรก
             print("Starting farm manually. Teleporting to initial position...")
             currentRootPart.CFrame = initialFarmPosition
             task.wait(0.1)
@@ -419,7 +522,6 @@ local function toggleOreFarmLoop(farmButton)
             end)
         end
         
-        -- ตรวจสอบครั้งแรกเผื่อมีหินเกิน 100 อยู่แล้ว
         task.spawn(function()
             task.wait(0.5)
             onInventoryChanged("Rock", farmButton)
@@ -427,7 +529,7 @@ local function toggleOreFarmLoop(farmButton)
         
     else
         isWaitingForRockToClear = false
-        farmButton.Text = "ฟามแร่"
+        farmButton.Text = "Farm Ore"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
         if inventoryConnection then
@@ -449,7 +551,7 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- ฟังก์ชันเดินไปจุดขายให้ฉลาดขึ้น
+-- Pathfinding walk to sell point
 local function walkToSellPoint()
     local character = LocalPlayer.Character
     if not character then return end
@@ -467,13 +569,13 @@ local function walkToSellPoint()
     end)
 
     if success and path.Status == Enum.PathStatus.Success then
-        print("คำนวณเส้นทางไปยังจุดขายสำเร็จ กำลังเดินตามจุด...")
+        print("Path to sell point calculated. Following waypoints...")
         local waypoints = path:GetWaypoints()
         
         local pathBlockedConnection
         local function onPathBlocked(blockedWaypointIndex)
             if blockedWaypointIndex < #waypoints then
-                print("เส้นทางไปยังจุดขายถูกบล็อก กำลังคำนวณใหม่...")
+                print("Path to sell point blocked. Recalculating...")
                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
                 walkToSellPoint() -- Restart the walk
             end
@@ -486,9 +588,9 @@ local function walkToSellPoint()
         end
         
         if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-        print("ถึงจุดขายเรียบร้อยแล้ว")
+        print("Arrived at the sell point.")
     else
-        warn("การคำนวณเส้นทางไปจุดขายล้มเหลว: ", errorMessage or "No path found.", "ใช้การเดินแบบตรงแทน")
+        warn("Pathfinding to sell point failed: ", errorMessage or "No path found.", "Using direct walk instead.")
         humanoid:MoveTo(destination)
     end
 end
@@ -508,7 +610,12 @@ end
 -- =============================================
 -- Main Execution & Event Connections
 -- =============================================
-local UIElements = createUI()
+-- Create UIs
+local UIElements = createControlPanelUI()
+local diamondCountLabel = createDiamondCounterUI()
+
+-- Setup Logic
+setupDiamondCounter(diamondCountLabel)
 
 -- Update Loop
 RunService.RenderStepped:Connect(function(deltaTime)
@@ -604,5 +711,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Updated Control Panel UI Loaded Successfully. 🛠️")
-
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. 🛠️💎")
