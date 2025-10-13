@@ -1,16 +1,15 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.2 (Robust Folder Cleanup)
+    Version: 3.3 (Anti-AFK Feature)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.2:
-    - Made the cleanup of 'workspace.Folder' more robust. The script now actively listens
-      for the folder's creation and deletes it immediately, ensuring it is always removed.
+    Update v3.3:
+    - Added an anti-AFK feature to prevent disconnection from the server during inactivity.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -762,6 +761,24 @@ if NetworkEvent then
     end)
 end
 
+-- [NEW] Anti-AFK Loop to prevent being kicked for inactivity
+task.spawn(function()
+    local VirtualUser = game:GetService("VirtualUser")
+    while true do
+        task.wait(240) -- Every 4 minutes, a safe interval to prevent AFK kick
+        
+        -- This simulates a brief keyboard press which signals activity to the server.
+        pcall(function()
+			VirtualUser:CaptureController()
+			VirtualUser:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+			task.wait(0.1)
+			VirtualUser:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+			print("Anti-AFK action performed to prevent disconnection.")
+		end)
+    end
+end)
+
+
 -- Player List Update Connections
 Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
@@ -787,5 +804,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.1 Anti-Stuck] 🛠️💎")
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.3 Anti-AFK] 🛠️💎")
 
