@@ -320,7 +320,7 @@ local function executeResumeFarmStep()
     findAndWalkToClosest()
 end
 
--- ฟังก์ชันสำหรับตรวจสอบการเปลี่ยนแปลงใน Inventory
+-- [[ แก้ไข ]] ฟังก์ชันสำหรับตรวจสอบการเปลี่ยนแปลงใน Inventory
 local function onInventoryChanged(attributeName, farmButton)
     if not inventoryFolder then return end
     
@@ -337,8 +337,7 @@ local function onInventoryChanged(attributeName, farmButton)
         print("Rock count reached 100. Auto-processing...")
         NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         
-        -- [[ แก้ไข ]] รอ 5 วินาทีหลังจากแปรรูป
-        task.wait(5) 
+        task.wait(1)
         
         print("Processing finished. Teleporting and waiting for inventory to clear...")
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -348,7 +347,16 @@ local function onInventoryChanged(attributeName, farmButton)
         
     -- เงื่อนไขที่ 2: ถ้ากำลังรอหินหมด และหินกลายเป็น 0 ให้กลับไปฟามต่อ
     elseif isWaitingForRockToClear and rockCount == 0 then
-        print("Rock inventory cleared. Resuming farming...")
+        print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
+        task.wait(5) -- <<<< [แก้ไข] เพิ่มการรอ 5 วินาที
+
+        -- ตรวจสอบว่าผู้ใช้ยกเลิกระหว่างรอหรือไม่
+        if not isWaitingForRockToClear then
+            print("Farming was cancelled during the wait. Aborting resume.")
+            return
+        end
+        
+        print("Resuming farming...")
         isWaitingForRockToClear = false
         isOreFarmLoopActive = true -- กลับมาฟามต่อ
 
@@ -571,4 +579,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Stabilized Control Panel UI (V13 - Noclip Removed) Loaded Successfully. 🛠️")
+print("Updated Control Panel UI Loaded Successfully. 🛠️")
