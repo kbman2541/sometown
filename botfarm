@@ -346,7 +346,10 @@ local function onInventoryChanged(attributeName, farmButton)
         farmButton.Text = "รอ Rock หมด..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         
-        print("Rock count reached 100. Preparing to warp and process.")
+        print("Rock count reached 100. Cooldown for 2 seconds before warp.")
+        task.wait(2) -- << [NEW] เพิ่มคูลดาวน์ 2 วินาที
+        
+        print("Preparing to warp and process.")
         
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         
@@ -602,5 +605,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("Updated Control Panel UI Loaded Successfully. 🛠️")
-
 
