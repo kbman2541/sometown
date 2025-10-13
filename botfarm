@@ -1,12 +1,17 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 2.0
+    Version: 3.0 (Responsive Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
+
+    Update v3.0:
+    - Main control panel is now responsive and scales with screen size.
+    - Added the ability to toggle the main control panel's visibility by pressing the 'F' key.
+    - The Diamond counter UI remains fixed in size and position, and is always visible.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -147,7 +152,7 @@ end
 -- UI Creation Functions
 -- =============================================
 
--- [MERGED] Diamond Counter UI Creation
+-- [MERGED] Diamond Counter UI Creation (Fixed Size and Position)
 local function createDiamondCounterUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ItemCounterGui"
@@ -213,12 +218,22 @@ local function createDiamondCounterUI()
     return countLabel
 end
 
--- Control Panel UI Creation
+-- Control Panel UI Creation (Responsive)
 local function createControlPanelUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
-    
+
+    -- [NEW] Add UIAspectRatioConstraint to make the UI responsive
+    local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+    AspectRatioConstraint.AspectRatio = 250 / 320
+    AspectRatioConstraint.DominantAxis = Enum.DominantAxis.Height
+    AspectRatioConstraint.Parent = ScreenGui
+
     -- Main Draggable Frame
-    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320); ControlPanelFrame.Position = UDim2.new(0.5, -125, 0.5, -160); ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
+    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; 
+    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320) -- Using offset for the constraint to work correctly
+    ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0); 
+    ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
+    ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
     local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
 
     -- Title Bar
@@ -259,6 +274,7 @@ local function createControlPanelUI()
     local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
     return {
+        ScreenGui = ScreenGui,
         CollapseButton = CollapseButton,
         CoordinateLabel = CoordinateLabel,
         InputBox = InputBox,
@@ -672,6 +688,19 @@ UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
 UIElements.WalkToSellButton.MouseButton1Click:Connect(walkToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
 
+
+-- [NEW] Keybind to toggle the main control panel
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    -- If the user is typing in a textbox, don't toggle the UI
+    if gameProcessedEvent then return end
+
+    if input.KeyCode == Enum.KeyCode.F then
+        -- Toggle the Enabled property of the ScreenGui to show/hide it
+        UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
+    end
+end)
+
+
 -- Auto-Eat/Drink Loop
 if NetworkEvent then
     task.spawn(function()
@@ -711,4 +740,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. 🛠️💎")
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.0 Responsive] 🛠️💎")
