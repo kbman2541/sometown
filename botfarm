@@ -346,17 +346,26 @@ local function onInventoryChanged(attributeName, farmButton)
         farmButton.Text = "รอ Rock หมด..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         
-        -- << [MODIFIED] เปลี่ยนลำดับ: วาปก่อนแล้วค่อย Process
-        print("Rock count reached 100. Warping to process point...")
+        print("Rock count reached 100. Preparing to warp and process.")
+        
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
         if currentRootPart then
+            print("Player character found. Current position:", currentRootPart.Position)
+            print("Warping to process point at:", postProcessFarmPosition.Position)
+            
+            -- << [MODIFIED] เปลี่ยนลำดับ: วาปก่อนแล้วค่อย Process
             currentRootPart.CFrame = postProcessFarmPosition -- วาปไปจุด Process
+            
+            print("Teleport command issued. Waiting 2 seconds...")
+            task.wait(2) -- << [MODIFIED] รอ 2 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
+            
+            print("Wait finished. Position after warp:", currentRootPart.Position)
+            print("Now sending 'Process' command to server...")
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+        else
+            warn("Could not find HumanoidRootPart to warp. Cannot process.")
         end
-
-        task.wait(2) -- << [MODIFIED] รอ 2 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
-
-        print("Warped. Now processing rocks...")
-        NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         
     -- เงื่อนไขที่ 2: ถ้ากำลังรอหินหมด และหินกลายเป็น 0 ให้กลับไปฟามต่อ
     elseif isWaitingForRockToClear and rockCount == 0 then
