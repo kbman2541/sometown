@@ -357,8 +357,8 @@ local function onInventoryChanged(attributeName, farmButton)
             -- << [MODIFIED] เปลี่ยนลำดับ: วาปก่อนแล้วค่อย Process
             currentRootPart.CFrame = postProcessFarmPosition -- วาปไปจุด Process
             
-            print("Teleport command issued. Waiting 2 seconds...")
-            task.wait(2) -- << [MODIFIED] รอ 2 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
+            print("Teleport command issued. Waiting 4 seconds...")
+            task.wait(4) -- << [MODIFIED] รอ 4 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
             
             print("Wait finished. Position after warp:", currentRootPart.Position)
             print("Now sending 'Process' command to server...")
@@ -602,4 +602,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("Updated Control Panel UI Loaded Successfully. 🛠️")
+
 
