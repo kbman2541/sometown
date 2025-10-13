@@ -353,7 +353,7 @@ local function onInventoryChanged(attributeName, farmButton)
             currentRootPart.CFrame = postProcessFarmPosition -- วาปไปจุด Process
         end
 
-        task.wait(0.2) -- รอสักครู่เพื่อให้แน่ใจว่าวาปทำงานแล้ว
+        task.wait(2) -- << [MODIFIED] รอ 2 วินาทีเพื่อให้แน่ใจว่าวาปทำงานแล้ว
 
         print("Warped. Now processing rocks...")
         NetworkEvent:FireServer("fire", nil, "Process", "Rock")
@@ -593,3 +593,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("Updated Control Panel UI Loaded Successfully. 🛠️")
+
