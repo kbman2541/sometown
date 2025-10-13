@@ -1,16 +1,16 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.1 (Anti-Stuck at Ore Update)
+    Version: 3.2 (Robust Folder Cleanup)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.1:
-    - Added an ore-specific anti-stuck feature. If the player is stationary near a target ore
-      for more than 10 seconds, the script will automatically find the next closest ore.
+    Update v3.2:
+    - Made the cleanup of 'workspace.Folder' more robust. The script now actively listens
+      for the folder's creation and deletes it immediately, ensuring it is always removed.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -33,13 +33,24 @@ local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 
 -- =============================================
--- [ADDED] Clean up workspace folder at the start
+-- [MODIFIED] Make workspace.Folder cleanup more robust
 -- =============================================
-local folderToDelete = Workspace:FindFirstChild("Folder")
-if folderToDelete then
-    folderToDelete:Destroy()
-    print("Workspace.Folder has been deleted as requested.")
+-- Initial check in case the folder already exists at script start
+local existingFolder = Workspace:FindFirstChild("Folder")
+if existingFolder then
+    existingFolder:Destroy()
+    print("Workspace.Folder found on startup and was deleted.")
 end
+
+-- Listen for the folder being added in the future to ensure it's always deleted
+Workspace.ChildAdded:Connect(function(child)
+    if child.Name == "Folder" then
+        task.wait() -- Allow the object to be fully parented before destroying
+        child:Destroy()
+        print("Workspace.Folder was added and has now been deleted.")
+    end
+end)
+
 
 -- Ensure this script only runs on the client
 if not RunService:IsClient() then
