@@ -1,19 +1,36 @@
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local keyToPress = Enum.KeyCode.Space
+
+while true do
+
+    task.wait(300)
+
+    VirtualInputManager:SendKeyEvent(true, keyToPress, false, game)
+
+    task.wait(0.1)
+
+    VirtualInputManager:SendKeyEvent(false, keyToPress, false, game)
+    
+    print("Anti-AFK: Correctly simulated a key press at " .. os.date("%X"))
+end
+
 --[[
-    Merged Control Panel & UI Script
-    Creator: Gemini
-    Version: 3.4 (Jump Anti-AFK & Warp to Sell)
+    Merged Control Panel & UI Script
+    Creator: Gemini
+    Version: 3.3 (Anti-AFK Feature)
 
-    Description:
-    This script provides a comprehensive control panel for players, including teleportation,
-    automated farming, and player interaction. It also includes a separate, dedicated UI 
-    element to display the player's "Diamond" count from their Inventory attributes.
+    Description:
+    This script provides a comprehensive control panel for players, including teleportation,
+    automated farming, and player interaction. It also includes a separate, dedicated UI 
+    element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.4:
-    - Replaced the anti-AFK system with a spacebar jump simulation to prevent disconnection.
-    - Changed the "Walk to Sell" function to an instant "Warp to Sell" for faster transactions.
+    Update v3.3:
+    - Added an anti-AFK feature to prevent disconnection from the server during inactivity.
 
-    Installation:
-    Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
+    Installation:
+    Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
 ]]
 
 -- =============================================
@@ -31,7 +48,6 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
-local VirtualInputManager = game:GetService("VirtualInputManager") -- Added for new Anti-AFK
 
 -- =============================================
 -- [MODIFIED] Make workspace.Folder cleanup more robust
@@ -39,23 +55,23 @@ local VirtualInputManager = game:GetService("VirtualInputManager") -- Added for 
 -- Initial check in case the folder already exists at script start
 local existingFolder = Workspace:FindFirstChild("Folder")
 if existingFolder then
-    existingFolder:Destroy()
-    print("Workspace.Folder found on startup and was deleted.")
+    existingFolder:Destroy()
+    print("Workspace.Folder found on startup and was deleted.")
 end
 
 -- Listen for the folder being added in the future to ensure it's always deleted
 Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "Folder" then
-        task.wait() -- Allow the object to be fully parented before destroying
-        child:Destroy()
-        print("Workspace.Folder was added and has now been deleted.")
-    end
+    if child.Name == "Folder" then
+        task.wait() -- Allow the object to be fully parented before destroying
+        child:Destroy()
+        print("Workspace.Folder was added and has now been deleted.")
+    end
 end)
 
 
 -- Ensure this script only runs on the client
 if not RunService:IsClient() then
-    return
+    return
 end
 
 -- =============================================
@@ -70,15 +86,15 @@ local NetworkEvent
 
 -- Safely get NetworkEvent
 pcall(function()
-    NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("NetworkFramework"):WaitForChild("NetworkEvent")
+    NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("NetworkFramework"):WaitForChild("NetworkEvent")
 end)
 
 -- Clean up old UI if it exists
 pcall(function()
-    if PlayerGui:FindFirstChild("CoordinateUI") then PlayerGui.CoordinateUI:Destroy() end
-    if PlayerGui:FindFirstChild("PlayerTeleportGui") then PlayerGui.PlayerTeleportGui:Destroy() end
-    if PlayerGui:FindFirstChild("CombinedControlUI") then PlayerGui.CombinedControlUI:Destroy() end
-    if PlayerGui:FindFirstChild("ItemCounterGui") then PlayerGui.ItemCounterGui:Destroy() end -- Cleanup for diamond counter
+    if PlayerGui:FindFirstChild("CoordinateUI") then PlayerGui.CoordinateUI:Destroy() end
+    if PlayerGui:FindFirstChild("PlayerTeleportGui") then PlayerGui.PlayerTeleportGui:Destroy() end
+    if PlayerGui:FindFirstChild("CombinedControlUI") then PlayerGui.CombinedControlUI:Destroy() end
+    if PlayerGui:FindFirstChild("ItemCounterGui") then PlayerGui.ItemCounterGui:Destroy() end -- Cleanup for diamond counter
 end)
 
 -- =============================================
@@ -91,72 +107,72 @@ local playerListFrame -- For player teleport list
 -- Teleport to Player Logic
 -- =============================================
 local function teleportToPlayerObject(targetPlayer)
-    local localCharacter = LocalPlayer.Character
-    local characterFolder = Workspace:FindFirstChild("Character")
-    local targetObject = characterFolder and characterFolder:FindFirstChild(targetPlayer.Name)
+    local localCharacter = LocalPlayer.Character
+    local characterFolder = Workspace:FindFirstChild("Character")
+    local targetObject = characterFolder and characterFolder:FindFirstChild(targetPlayer.Name)
 
-    if localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") and targetObject then
-        local targetPosition
-        if targetObject:IsA("Model") and targetObject.PrimaryPart then
-            targetPosition = targetObject.PrimaryPart.CFrame.Position
-        elseif targetObject:IsA("BasePart") then
-            targetPosition = targetObject.Position
-        else
-            warn("Could not determine position for target object: '" .. targetObject.Name .. "'")
-            return
-        end
+    if localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") and targetObject then
+        local targetPosition
+        if targetObject:IsA("Model") and targetObject.PrimaryPart then
+            targetPosition = targetObject.PrimaryPart.CFrame.Position
+        elseif targetObject:IsA("BasePart") then
+            targetPosition = targetObject.Position
+        else
+            warn("Could not determine position for target object: '" .. targetObject.Name .. "'")
+            return
+        end
 
-        local success, err = pcall(function()
-            print("Teleporting to " .. targetPlayer.Name .. "'s object...")
-            localCharacter.HumanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
-        end)
-        if not success then warn("Teleport failed: ", err) end
-    else
-        if not targetObject then
-            print("Teleport failed: Cannot find object for player '" .. targetPlayer.Name .. "'")
-        else
-            print("Teleport failed: Local player's character not found.")
-        end
-    end
+        local success, err = pcall(function()
+            print("Teleporting to " .. targetPlayer.Name .. "'s object...")
+            localCharacter.HumanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
+        end)
+        if not success then warn("Teleport failed: ", err) end
+    else
+        if not targetObject then
+            print("Teleport failed: Cannot find object for player '" .. targetPlayer.Name .. "'")
+        else
+            print("Teleport failed: Local player's character not found.")
+        end
+    end
 end
 
 local function updatePlayerList()
-    if not playerListFrame or not playerListFrame.Parent then return end
+    if not playerListFrame or not playerListFrame.Parent then return end
 
-    local existingButtons = {}
-    for _, child in ipairs(playerListFrame:GetChildren()) do
-        if child:IsA("TextButton") then existingButtons[child.Name] = child end
-    end
-    
-    local characterFolder = Workspace:FindFirstChild("Character")
+    local existingButtons = {}
+    for _, child in ipairs(playerListFrame:GetChildren()) do
+        if child:IsA("TextButton") then existingButtons[child.Name] = child end
+    end
+    
+    local characterFolder = Workspace:FindFirstChild("Character")
 
-    if characterFolder then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player == LocalPlayer then continue end
-            local targetObject = characterFolder:FindFirstChild(player.Name)
-            if targetObject then
-                if not existingButtons[player.Name] then
-                    local playerButton = Instance.new("TextButton")
-                    playerButton.Name = player.Name
-                    playerButton.Text = player.DisplayName
-                    playerButton.Size = UDim2.new(1, 0, 0, 30)
-                    playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                    playerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    playerButton.Font = Enum.Font.SourceSans
-                    playerButton.TextSize = 16
-                    playerButton.Parent = playerListFrame
-                    playerButton.MouseButton1Click:Connect(function()
-                        teleportToPlayerObject(player)
-                    end)
-                end
-                existingButtons[player.Name] = nil
-            end
-        end
-    end
+    if characterFolder then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player == LocalPlayer then continue end
+            local targetObject = characterFolder:FindFirstChild(player.Name)
+            if targetObject then
+                if not existingButtons[player.Name] then
+                    local playerButton = Instance.new("TextButton")
+                    playerButton.Name = player.Name
+                    playerButton.Text = player.DisplayName
+                    playerButton.Size = UDim2.new(1, 0, 0, 30)
+                    playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                    playerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    playerButton.Font = Enum.Font.SourceSans
+                    playerButton.TextSize = 16
+                    playerButton.Parent = playerListFrame
+                    playerButton.MouseButton1Click:Connect(function()
+                        teleportToPlayerObject(player)
+                    end)
+                end
+                existingButtons[player.Name] = nil
+            end
+        end
+    end
 
-    for _, button in pairs(existingButtons) do
-        button:Destroy()
-    end
+    for _, button in pairs(existingButtons) do
+        button:Destroy()
+    end
 end
 
 -- =============================================
@@ -165,140 +181,140 @@ end
 
 -- [MERGED] Diamond Counter UI Creation (Fixed Size and Position)
 local function createDiamondCounterUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "ItemCounterGui"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    local shadowFrame = Instance.new("Frame")
-    shadowFrame.Name = "ShadowFrame"
-    shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-    shadowFrame.BackgroundTransparency = 0.6
-    shadowFrame.BorderSizePixel = 0
-    shadowFrame.Position = UDim2.new(0, 15 + 3, 0, 15 + 3) 
-    shadowFrame.Size = UDim2.new(0, 220, 0, 60)
-    shadowFrame.ZIndex = 1
-    shadowFrame.Parent = screenGui
-    
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 12)
-    shadowCorner.Parent = shadowFrame
-    
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "CounterFrame"
-    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
-    mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
-    mainFrame.BorderSizePixel = 1
-    mainFrame.Position = UDim2.new(0, 15, 0, 15)
-    mainFrame.Size = UDim2.new(0, 220, 0, 60)
-    mainFrame.ZIndex = 2
-    mainFrame.Parent = screenGui
-    
-    local uiCorner = Instance.new("UICorner")
-    uiCorner.CornerRadius = UDim.new(0, 12)
-    uiCorner.Parent = mainFrame
-    
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "Title"
-    titleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
-    titleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 24
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Position = UDim2.new(0, 15, 0.5, 0)
-    titleLabel.Size = UDim2.new(1, -95, 0, 30)
-    titleLabel.AnchorPoint = Vector2.new(0, 0.5)
-    titleLabel.Parent = mainFrame
-    
-    local countLabel = Instance.new("TextLabel")
-    countLabel.Name = "Count"
-    countLabel.Text = "..."
-    countLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-    countLabel.BackgroundTransparency = 1
-    countLabel.Font = Enum.Font.SourceSansBold
-    countLabel.TextSize = 28
-    countLabel.TextXAlignment = Enum.TextXAlignment.Right
-    countLabel.Position = UDim2.new(1, -15, 0.5, 0)
-    countLabel.Size = UDim2.new(0, 80, 0, 30)
-    countLabel.AnchorPoint = Vector2.new(1, 0.5)
-    countLabel.Parent = mainFrame
-    
-    screenGui.Parent = PlayerGui
-    
-    return countLabel
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ItemCounterGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local shadowFrame = Instance.new("Frame")
+    shadowFrame.Name = "ShadowFrame"
+    shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    shadowFrame.BackgroundTransparency = 0.6
+    shadowFrame.BorderSizePixel = 0
+    shadowFrame.Position = UDim2.new(0, 15 + 3, 0, 15 + 3) 
+    shadowFrame.Size = UDim2.new(0, 220, 0, 60)
+    shadowFrame.ZIndex = 1
+    shadowFrame.Parent = screenGui
+    
+    local shadowCorner = Instance.new("UICorner")
+    shadowCorner.CornerRadius = UDim.new(0, 12)
+    shadowCorner.Parent = shadowFrame
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "CounterFrame"
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
+    mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
+    mainFrame.BorderSizePixel = 1
+    mainFrame.Position = UDim2.new(0, 15, 0, 15)
+    mainFrame.Size = UDim2.new(0, 220, 0, 60)
+    mainFrame.ZIndex = 2
+    mainFrame.Parent = screenGui
+    
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 12)
+    uiCorner.Parent = mainFrame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
+    titleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 24
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Position = UDim2.new(0, 15, 0.5, 0)
+    titleLabel.Size = UDim2.new(1, -95, 0, 30)
+    titleLabel.AnchorPoint = Vector2.new(0, 0.5)
+    titleLabel.Parent = mainFrame
+    
+    local countLabel = Instance.new("TextLabel")
+    countLabel.Name = "Count"
+    countLabel.Text = "..."
+    countLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    countLabel.BackgroundTransparency = 1
+    countLabel.Font = Enum.Font.SourceSansBold
+    countLabel.TextSize = 28
+    countLabel.TextXAlignment = Enum.TextXAlignment.Right
+    countLabel.Position = UDim2.new(1, -15, 0.5, 0)
+    countLabel.Size = UDim2.new(0, 80, 0, 30)
+    countLabel.AnchorPoint = Vector2.new(1, 0.5)
+    countLabel.Parent = mainFrame
+    
+    screenGui.Parent = PlayerGui
+    
+    return countLabel
 end
 
 -- Control Panel UI Creation (Responsive)
 local function createControlPanelUI()
-    local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
+    local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
 
-    -- [NEW] Add UIAspectRatioConstraint to make the UI responsive
-    local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
-    AspectRatioConstraint.AspectRatio = 250 / 320
-    AspectRatioConstraint.DominantAxis = Enum.DominantAxis.Height
-    AspectRatioConstraint.Parent = ScreenGui
+    -- [NEW] Add UIAspectRatioConstraint to make the UI responsive
+    local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+    AspectRatioConstraint.AspectRatio = 250 / 320
+    AspectRatioConstraint.DominantAxis = Enum.DominantAxis.Height
+    AspectRatioConstraint.Parent = ScreenGui
 
-    -- Main Draggable Frame
-    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; 
-    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320) -- Using offset for the constraint to work correctly
-    ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0); 
-    ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
-    ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
-    local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
+    -- Main Draggable Frame
+    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; 
+    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320) -- Using offset for the constraint to work correctly
+    ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0); 
+    ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
+    ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
+    local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
 
-    -- Title Bar
-    local TitleBar = Instance.new("Frame"); TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 30); TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 60); TitleBar.BorderSizePixel = 0; TitleBar.Parent = ControlPanelFrame
-    local UICorner_Title = Instance.new("UICorner", TitleBar); UICorner_Title.CornerRadius = UDim.new(0, 8)
-    local TitleLabel = Instance.new("TextLabel"); TitleLabel.Parent = TitleBar; TitleLabel.Name = "TitleLabel"; TitleLabel.Size = UDim2.new(1, -40, 1, 0); TitleLabel.Position = UDim2.new(0, 10, 0, 0); TitleLabel.BackgroundTransparency = 1; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.Text = "Control Panel"; TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.TextSize = 18; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    local CollapseButton = Instance.new("TextButton"); CollapseButton.Parent = TitleBar; CollapseButton.Name = "CollapseButton"; CollapseButton.Size = UDim2.new(0, 20, 0, 20); CollapseButton.Position = UDim2.new(1, -25, 0.5, -10); CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 75); CollapseButton.Font = Enum.Font.SourceSansBold; CollapseButton.Text = "–"; CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CollapseButton.TextSize = 18
-    local UICorner_Collapse = Instance.new("UICorner", CollapseButton); UICorner_Collapse.CornerRadius = UDim.new(0, 4)
+    -- Title Bar
+    local TitleBar = Instance.new("Frame"); TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 30); TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 60); TitleBar.BorderSizePixel = 0; TitleBar.Parent = ControlPanelFrame
+    local UICorner_Title = Instance.new("UICorner", TitleBar); UICorner_Title.CornerRadius = UDim.new(0, 8)
+    local TitleLabel = Instance.new("TextLabel"); TitleLabel.Parent = TitleBar; TitleLabel.Name = "TitleLabel"; TitleLabel.Size = UDim2.new(1, -40, 1, 0); TitleLabel.Position = UDim2.new(0, 10, 0, 0); TitleLabel.BackgroundTransparency = 1; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.Text = "Control Panel"; TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.TextSize = 18; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    local CollapseButton = Instance.new("TextButton"); CollapseButton.Parent = TitleBar; CollapseButton.Name = "CollapseButton"; CollapseButton.Size = UDim2.new(0, 20, 0, 20); CollapseButton.Position = UDim2.new(1, -25, 0.5, -10); CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 75); CollapseButton.Font = Enum.Font.SourceSansBold; CollapseButton.Text = "–"; CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CollapseButton.TextSize = 18
+    local UICorner_Collapse = Instance.new("UICorner", CollapseButton); UICorner_Collapse.CornerRadius = UDim.new(0, 4)
 
-    -- Tab Container
-    local TabContainer = Instance.new("Frame"); TabContainer.Name = "TabContainer"; TabContainer.Size = UDim2.new(1, 0, 0, 30); TabContainer.Position = UDim2.new(0, 0, 0, 30); TabContainer.BackgroundTransparency = 1; TabContainer.Parent = ControlPanelFrame
-    local ControlsTabButton = Instance.new("TextButton"); ControlsTabButton.Name = "ControlsTabButton"; ControlsTabButton.Size = UDim2.new(0.5, 0, 1, 0); ControlsTabButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80); ControlsTabButton.Font = Enum.Font.SourceSansBold; ControlsTabButton.Text = "Controls"; ControlsTabButton.TextColor3 = Color3.fromRGB(255, 255, 255); ControlsTabButton.TextSize = 16; ControlsTabButton.Parent = TabContainer
-    local PlayersTabButton = Instance.new("TextButton"); PlayersTabButton.Name = "PlayersTabButton"; PlayersTabButton.Size = UDim2.new(0.5, 0, 1, 0); PlayersTabButton.Position = UDim2.new(0.5, 0, 0, 0); PlayersTabButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50); PlayersTabButton.Font = Enum.Font.SourceSansBold; PlayersTabButton.Text = "Players"; PlayersTabButton.TextColor3 = Color3.fromRGB(200, 200, 200); PlayersTabButton.TextSize = 16; PlayersTabButton.Parent = TabContainer
+    -- Tab Container
+    local TabContainer = Instance.new("Frame"); TabContainer.Name = "TabContainer"; TabContainer.Size = UDim2.new(1, 0, 0, 30); TabContainer.Position = UDim2.new(0, 0, 0, 30); TabContainer.BackgroundTransparency = 1; TabContainer.Parent = ControlPanelFrame
+    local ControlsTabButton = Instance.new("TextButton"); ControlsTabButton.Name = "ControlsTabButton"; ControlsTabButton.Size = UDim2.new(0.5, 0, 1, 0); ControlsTabButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80); ControlsTabButton.Font = Enum.Font.SourceSansBold; ControlsTabButton.Text = "Controls"; ControlsTabButton.TextColor3 = Color3.fromRGB(255, 255, 255); ControlsTabButton.TextSize = 16; ControlsTabButton.Parent = TabContainer
+    local PlayersTabButton = Instance.new("TextButton"); PlayersTabButton.Name = "PlayersTabButton"; PlayersTabButton.Size = UDim2.new(0.5, 0, 1, 0); PlayersTabButton.Position = UDim2.new(0.5, 0, 0, 0); PlayersTabButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50); PlayersTabButton.Font = Enum.Font.SourceSansBold; PlayersTabButton.Text = "Players"; PlayersTabButton.TextColor3 = Color3.fromRGB(200, 200, 200); PlayersTabButton.TextSize = 16; PlayersTabButton.Parent = TabContainer
 
-    -- Content Frames for Tabs
-    local ContentContainer = Instance.new("Frame"); ContentContainer.Name = "ContentContainer"; ContentContainer.Size = UDim2.new(1, 0, 1, -60); ContentContainer.Position = UDim2.new(0, 0, 0, 60); ContentContainer.BackgroundTransparency = 1; ContentContainer.Parent = ControlPanelFrame
-    
-    -- Controls Content
-    local ControlsContentFrame = Instance.new("Frame"); ControlsContentFrame.Name = "ControlsContent"; ControlsContentFrame.Size = UDim2.new(1, 0, 1, 0); ControlsContentFrame.BackgroundTransparency = 1; ControlsContentFrame.Parent = ContentContainer; ControlsContentFrame.Visible = true
-    local CoordinateLabel = Instance.new("TextLabel"); CoordinateLabel.Parent = ControlsContentFrame; CoordinateLabel.Name = "CoordinateLabel"; CoordinateLabel.Size = UDim2.new(1, -20, 0, 30); CoordinateLabel.Position = UDim2.new(0, 10, 0, 0); CoordinateLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 65); CoordinateLabel.Font = Enum.Font.SourceSansBold; CoordinateLabel.Text = "X: 0.0, Y: 0.0, Z: 0.0"; CoordinateLabel.TextColor3 = Color3.fromRGB(200, 200, 200); CoordinateLabel.TextSize = 16
-    local UICorner_CoordLabel = Instance.new("UICorner", CoordinateLabel); UICorner_CoordLabel.CornerRadius = UDim.new(0, 6)
-    local InputBox = Instance.new("TextBox"); InputBox.Parent = ControlsContentFrame; InputBox.Name = "InputBox"; InputBox.Size = UDim2.new(1, -70, 0, 30); InputBox.Position = UDim2.new(0, 10, 0, 40); InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 65); InputBox.Font = Enum.Font.SourceSans; InputBox.Text = "X, Y, Z"; InputBox.TextColor3 = Color3.fromRGB(200, 200, 200); InputBox.TextSize = 16; InputBox.ClearTextOnFocus = true
-    local UICorner_InputBox = Instance.new("UICorner", InputBox); UICorner_InputBox.CornerRadius = UDim.new(0, 6)
-    local TeleportButton = Instance.new("TextButton"); TeleportButton.Parent = ControlsContentFrame; TeleportButton.Name = "TeleportButton"; TeleportButton.Size = UDim2.new(0, 50, 0, 30); TeleportButton.Position = UDim2.new(1, -60, 0, 40); TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); TeleportButton.Font = Enum.Font.SourceSansBold; TeleportButton.Text = "Go"; TeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportButton.TextSize = 16
-    local UICorner_TeleportBtn = Instance.new("UICorner", TeleportButton); UICorner_TeleportBtn.CornerRadius = UDim.new(0, 6)
-    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "ฟามแร่"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
-    local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
-    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
-    local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local WarpToSellButton = Instance.new("TextButton"); WarpToSellButton.Name = "WarpToSellButton"; WarpToSellButton.Size = UDim2.new(1, -20, 0, 30); WarpToSellButton.Position = UDim2.new(0, 10, 0, 160); WarpToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WarpToSellButton.Font = Enum.Font.SourceSansBold; WarpToSellButton.Text = "วาปไปจุดขาย"; WarpToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToSellButton.TextSize = 16; WarpToSellButton.Parent = ControlsContentFrame
-    local UICorner_WarpSellBtn = Instance.new("UICorner", WarpToSellButton); UICorner_WarpSellBtn.CornerRadius = UDim.new(0, 6)
+    -- Content Frames for Tabs
+    local ContentContainer = Instance.new("Frame"); ContentContainer.Name = "ContentContainer"; ContentContainer.Size = UDim2.new(1, 0, 1, -60); ContentContainer.Position = UDim2.new(0, 0, 0, 60); ContentContainer.BackgroundTransparency = 1; ContentContainer.Parent = ControlPanelFrame
+    
+    -- Controls Content
+    local ControlsContentFrame = Instance.new("Frame"); ControlsContentFrame.Name = "ControlsContent"; ControlsContentFrame.Size = UDim2.new(1, 0, 1, 0); ControlsContentFrame.BackgroundTransparency = 1; ControlsContentFrame.Parent = ContentContainer; ControlsContentFrame.Visible = true
+    local CoordinateLabel = Instance.new("TextLabel"); CoordinateLabel.Parent = ControlsContentFrame; CoordinateLabel.Name = "CoordinateLabel"; CoordinateLabel.Size = UDim2.new(1, -20, 0, 30); CoordinateLabel.Position = UDim2.new(0, 10, 0, 0); CoordinateLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 65); CoordinateLabel.Font = Enum.Font.SourceSansBold; CoordinateLabel.Text = "X: 0.0, Y: 0.0, Z: 0.0"; CoordinateLabel.TextColor3 = Color3.fromRGB(200, 200, 200); CoordinateLabel.TextSize = 16
+    local UICorner_CoordLabel = Instance.new("UICorner", CoordinateLabel); UICorner_CoordLabel.CornerRadius = UDim.new(0, 6)
+    local InputBox = Instance.new("TextBox"); InputBox.Parent = ControlsContentFrame; InputBox.Name = "InputBox"; InputBox.Size = UDim2.new(1, -70, 0, 30); InputBox.Position = UDim2.new(0, 10, 0, 40); InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 65); InputBox.Font = Enum.Font.SourceSans; InputBox.Text = "X, Y, Z"; InputBox.TextColor3 = Color3.fromRGB(200, 200, 200); InputBox.TextSize = 16; InputBox.ClearTextOnFocus = true
+    local UICorner_InputBox = Instance.new("UICorner", InputBox); UICorner_InputBox.CornerRadius = UDim.new(0, 6)
+    local TeleportButton = Instance.new("TextButton"); TeleportButton.Parent = ControlsContentFrame; TeleportButton.Name = "TeleportButton"; TeleportButton.Size = UDim2.new(0, 50, 0, 30); TeleportButton.Position = UDim2.new(1, -60, 0, 40); TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); TeleportButton.Font = Enum.Font.SourceSansBold; TeleportButton.Text = "Go"; TeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportButton.TextSize = 16
+    local UICorner_TeleportBtn = Instance.new("UICorner", TeleportButton); UICorner_TeleportBtn.CornerRadius = UDim.new(0, 6)
+    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "ฟามแร่"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
+    local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
+    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
+    local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
+    local WalkToSellButton = Instance.new("TextButton"); WalkToSellButton.Name = "WalkToSellButton"; WalkToSellButton.Size = UDim2.new(1, -20, 0, 30); WalkToSellButton.Position = UDim2.new(0, 10, 0, 160); WalkToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WalkToSellButton.Font = Enum.Font.SourceSansBold; WalkToSellButton.Text = "เดินไปจุดขาย"; WalkToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToSellButton.TextSize = 16; WalkToSellButton.Parent = ControlsContentFrame
+    local UICorner_WalkSellBtn = Instance.new("UICorner", WalkToSellButton); UICorner_WalkSellBtn.CornerRadius = UDim.new(0, 6)
 
-    -- Players Content
-    local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
-    local WarpToKealohaButton = Instance.new("TextButton"); WarpToKealohaButton.Name = "WarpToKealohaButton"; WarpToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WarpToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WarpToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WarpToKealohaButton.Font = Enum.Font.SourceSansBold; WarpToKealohaButton.Text = "วาปหา KealohaWeaver5712"; WarpToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToKealohaButton.TextSize = 16; WarpToKealohaButton.Parent = PlayersContentFrame
-    local UICorner_WarpKealohaBtn = Instance.new("UICorner", WarpToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
-    playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
-    local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    -- Players Content
+    local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
+    local WarpToKealohaButton = Instance.new("TextButton"); WarpToKealohaButton.Name = "WarpToKealohaButton"; WarpToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WarpToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WarpToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WarpToKealohaButton.Font = Enum.Font.SourceSansBold; WarpToKealohaButton.Text = "วาปหา KealohaWeaver5712"; WarpToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToKealohaButton.TextSize = 16; WarpToKealohaButton.Parent = PlayersContentFrame
+    local UICorner_WarpKealohaBtn = Instance.new("UICorner", WarpToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
+    playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
+    local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-    return {
-        ScreenGui = ScreenGui,
-        CollapseButton = CollapseButton,
-        CoordinateLabel = CoordinateLabel,
-        InputBox = InputBox,
-        TeleportButton = TeleportButton,
-        FarmOreButton = FarmOreButton,
-        BuyFoodButton = BuyFoodButton,
-        WarpToSellButton = WarpToSellButton,
-        WarpToKealohaButton = WarpToKealohaButton,
-        ControlsTabButton = ControlsTabButton,
-        PlayersTabButton = PlayersTabButton,
-        ControlsContentFrame = ControlsContentFrame,
-        PlayersContentFrame = PlayersContentFrame
-    }
+    return {
+        ScreenGui = ScreenGui,
+        CollapseButton = CollapseButton,
+        CoordinateLabel = CoordinateLabel,
+        InputBox = InputBox,
+        TeleportButton = TeleportButton,
+        FarmOreButton = FarmOreButton,
+        BuyFoodButton = BuyFoodButton,
+        WalkToSellButton = WalkToSellButton,
+        WarpToKealohaButton = WarpToKealohaButton,
+        ControlsTabButton = ControlsTabButton,
+        PlayersTabButton = PlayersTabButton,
+        ControlsContentFrame = ControlsContentFrame,
+        PlayersContentFrame = PlayersContentFrame
+    }
 end
 
 -- =============================================
@@ -318,151 +334,151 @@ local antiStuckThreshold = 5
 local currentTargetOre = nil
 local timeAtOreStationary = 0
 local antiStuckAtOreThreshold = 10 -- User-defined 10 seconds
-local distanceToOreThreshold = 3     -- User-defined 3 studs distance
+local distanceToOreThreshold = 3   -- User-defined 3 studs distance
 
 -- [MERGED] Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
-    if not inventoryFolder then 
-        warn("Diamond Counter: Inventory folder not found!")
-        return
-    end
+    if not inventoryFolder then 
+        warn("Diamond Counter: Inventory folder not found!")
+        return
+    end
 
-    local function updateAttributeCount()
-        local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
-        countLabel.Text = tostring(amount)
-    end
+    local function updateAttributeCount()
+        local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
+        countLabel.Text = tostring(amount)
+    end
 
-    updateAttributeCount() -- Initial update
+    updateAttributeCount() -- Initial update
 
-    inventoryFolder.AttributeChanged:Connect(function(attributeName)
-        if attributeName == DIAMOND_ATTRIBUTE_NAME then
-            updateAttributeCount()
-        end
-    end)
-    print("Diamond Counter UI logic initialized.")
+    inventoryFolder.AttributeChanged:Connect(function(attributeName)
+        if attributeName == DIAMOND_ATTRIBUTE_NAME then
+            updateAttributeCount()
+        end
+    end)
+    print("Diamond Counter UI logic initialized.")
 end
 
 
 -- New function to safely create the list of objects to track
 local function getObjectsToTrack()
-    local trackList = {}
-    local farm = Workspace:FindFirstChild("Farm")
-    if not farm then
-        warn("'Farm' folder not found in Workspace.")
-        return trackList
-    end
+    local trackList = {}
+    local farm = Workspace:FindFirstChild("Farm")
+    if not farm then
+        warn("'Farm' folder not found in Workspace.")
+        return trackList
+    end
 
-    local rockFolder = farm:FindFirstChild("Rock")
-    if not rockFolder then
-        warn("'Rock' folder not found in Workspace.Farm.")
-        return trackList
-    end
+    local rockFolder = farm:FindFirstChild("Rock")
+    if not rockFolder then
+        warn("'Rock' folder not found in Workspace.Farm.")
+        return trackList
+    end
 
-    for _, child in ipairs(rockFolder:GetChildren()) do
-        if child:IsA("PVInstance") then
-            table.insert(trackList, child)
-        end
-    end
-    
-    return trackList
+    for _, child in ipairs(rockFolder:GetChildren()) do
+        if child:IsA("PVInstance") then
+            table.insert(trackList, child)
+        end
+    end
+    
+    return trackList
 end
 
 -- Pathfinding walk function
 local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added parameter
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-    if not (humanoid and rootPart and humanoid.Health > 0 and isOreFarmLoopActive) then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not (humanoid and rootPart and humanoid.Health > 0 and isOreFarmLoopActive) then return end
 
-    task.wait(0.5)
+    task.wait(0.5)
 
-    local objectsToTrack = getObjectsToTrack()
-    if #objectsToTrack == 0 then
-        warn("No objects to track were found. Aborting walk.")
+    local objectsToTrack = getObjectsToTrack()
+    if #objectsToTrack == 0 then
+        warn("No objects to track were found. Aborting walk.")
 		currentTargetOre = nil -- [NEW] Reset target ore
-        return
-    end
+        return
+    end
 
-    local closestObject, minDistance = nil, math.huge
-    for _, obj in ipairs(objectsToTrack) do
-        -- [MODIFIED] Check if the object is valid and not the one to exclude
-        if obj and obj.Parent and obj ~= oreToExclude then
-            local dist = (rootPart.Position - obj.WorldPivot.Position).Magnitude
-            if dist < minDistance then
-                minDistance, closestObject = dist, obj
-            end
-        end
-    end
+    local closestObject, minDistance = nil, math.huge
+    for _, obj in ipairs(objectsToTrack) do
+        -- [MODIFIED] Check if the object is valid and not the one to exclude
+        if obj and obj.Parent and obj ~= oreToExclude then
+            local dist = (rootPart.Position - obj.WorldPivot.Position).Magnitude
+            if dist < minDistance then
+                minDistance, closestObject = dist, obj
+            end
+        end
+    end
 
-    if closestObject then
+    if closestObject then
 		currentTargetOre = closestObject -- [NEW] Set the new target ore
-        print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
-        
-        local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
-        local path = PathfindingService:CreatePath(agentParameters)
-        
-        local success, errorMessage = pcall(function()
-            path:ComputeAsync(rootPart.Position, closestObject.WorldPivot.Position)
-        end)
+        print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
+        
+        local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+        local path = PathfindingService:CreatePath(agentParameters)
+        
+        local success, errorMessage = pcall(function()
+            path:ComputeAsync(rootPart.Position, closestObject.WorldPivot.Position)
+        end)
 
-        if success and path.Status == Enum.PathStatus.Success then
-            print("Path calculated. Following waypoints...")
-            local waypoints = path:Getwaypoints()
-            
-            local pathBlockedConnection
-            local function onPathBlocked(blockedWaypointIndex)
-                if blockedWaypointIndex < #waypoints then
-                    print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
-                    if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                    findAndWalkToClosestOre(nil)
-                end
-            end
-            pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+        if success and path.Status == Enum.PathStatus.Success then
+            print("Path calculated. Following waypoints...")
+            local waypoints = path:GetWaypoints()
+            
+            local pathBlockedConnection
+            local function onPathBlocked(blockedWaypointIndex)
+                if blockedWaypointIndex < #waypoints then
+                    print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
+                    if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                    findAndWalkToClosestOre(nil)
+                end
+            end
+            pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
 
-            for i, waypoint in ipairs(waypoints) do
-                if not isOreFarmLoopActive then
-                    print("Farming stopped mid-path. Aborting walk.")
-                    break
-                end
-                humanoid:MoveTo(waypoint.Position)
-                humanoid.MoveToFinished:Wait()
-            end
-            
-            if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-            print("Reached destination or path ended.")
-        else
-            warn("Pathfinding to ore failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
-            humanoid:MoveTo(closestObject.WorldPivot.Position)
-        end
-    else
+            for i, waypoint in ipairs(waypoints) do
+                if not isOreFarmLoopActive then
+                    print("Farming stopped mid-path. Aborting walk.")
+                    break
+                end
+                humanoid:MoveTo(waypoint.Position)
+                humanoid.MoveToFinished:Wait()
+            end
+            
+            if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+            print("Reached destination or path ended.")
+        else
+            warn("Pathfinding to ore failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
+            humanoid:MoveTo(closestObject.WorldPivot.Position)
+        end
+    else
 		currentTargetOre = nil -- [NEW] Reset if no object is found
-        warn("Could not find any valid objects to walk to (excluding current target).")
-    end
+        warn("Could not find any valid objects to walk to (excluding current target).")
+    end
 end
 
 -- Teleport to Coords
 local function teleportPlayer(inputBox)
-    local currentCharacter = LocalPlayer.Character
-    local currentRootPart = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart then
-        inputBox.Text = "Error: Character not found"
-        return
-    end
+    local currentCharacter = LocalPlayer.Character
+    local currentRootPart = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+    if not currentRootPart then
+        inputBox.Text = "Error: Character not found"
+        return
+    end
 
-    local parts = inputBox.Text:split(",")
-    if #parts == 3 then
-        local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
-        if x and y and z then
-            currentRootPart.CFrame = CFrame.new(x, y, z)
-            inputBox.Text = ""
-        else
-            inputBox.Text = "Error: Invalid Format"
-        end
-    else
-        inputBox.Text = "Error: Use X,Y,Z"
-    end
+    local parts = inputBox.Text:split(",")
+    if #parts == 3 then
+        local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
+        if x and y and z then
+            currentRootPart.CFrame = CFrame.new(x, y, z)
+            inputBox.Text = ""
+        else
+            inputBox.Text = "Error: Invalid Format"
+        end
+    else
+        inputBox.Text = "Error: Use X,Y,Z"
+    end
 end
 
 -- Farming coordinates
@@ -471,144 +487,176 @@ local postProcessFarmPosition = CFrame.new(-332, 35, -2680)
 
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
-    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart or not isOreFarmLoopActive then return end
-    currentRootPart.CFrame = postProcessFarmPosition
-    task.wait(0.1)
-    findAndWalkToClosestOre(nil)
+    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not currentRootPart or not isOreFarmLoopActive then return end
+    currentRootPart.CFrame = postProcessFarmPosition
+    task.wait(0.1)
+    findAndWalkToClosestOre(nil)
 end
 
 -- Inventory change handler for farming
 local function onInventoryChanged(attributeName, farmButton)
-    if not inventoryFolder then return end
-    
-    local rockCount = inventoryFolder:GetAttribute("Rock") or 0
+    if not inventoryFolder then return end
+    
+    local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
-        isWaitingForRockToClear = true
-        isOreFarmLoopActive = false -- Pause farming
+    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
+        isWaitingForRockToClear = true
+        isOreFarmLoopActive = false -- Pause farming
 
-        farmButton.Text = "Waiting for Rock..."
-        farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        
-        print("Rock count reached 100. Cooldown for 2 seconds before warp.")
-        task.wait(2)
-        
-        print("Preparing to warp and process.")
-        
-        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if currentRootPart then
-            print("Warping to process point at:", postProcessFarmPosition.Position)
-            
-            currentRootPart.CFrame = postProcessFarmPosition
-            
-            print("Teleport command issued. Waiting 4 seconds...")
-            task.wait(4)
-            
-            print("Wait finished. Sending 'Process' command to server...")
-            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-        else
-            warn("Could not find HumanoidRootPart to warp. Cannot process.")
-        end
-        
-    elseif isWaitingForRockToClear and rockCount == 0 then
-        print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
-        task.wait(5)
+        farmButton.Text = "Waiting for Rock..."
+        farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        
+        print("Rock count reached 100. Cooldown for 2 seconds before warp.")
+        task.wait(2)
+        
+        print("Preparing to warp and process.")
+        
+        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if currentRootPart then
+            print("Warping to process point at:", postProcessFarmPosition.Position)
+            
+            currentRootPart.CFrame = postProcessFarmPosition
+            
+            print("Teleport command issued. Waiting 4 seconds...")
+            task.wait(4)
+            
+            print("Wait finished. Sending 'Process' command to server...")
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+        else
+            warn("Could not find HumanoidRootPart to warp. Cannot process.")
+        end
+        
+    elseif isWaitingForRockToClear and rockCount == 0 then
+        print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
+        task.wait(5)
 
-        if not isWaitingForRockToClear then
-            print("Farming was cancelled during the wait. Aborting resume.")
-            return
-        end
-        
-        print("Resuming farming...")
-        isWaitingForRockToClear = false
-        isOreFarmLoopActive = true -- Resume farming
+        if not isWaitingForRockToClear then
+            print("Farming was cancelled during the wait. Aborting resume.")
+            return
+        end
+        
+        print("Resuming farming...")
+        isWaitingForRockToClear = false
+        isOreFarmLoopActive = true -- Resume farming
 
-        farmButton.Text = "Stop Farming"
-        farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-        
-        executeResumeFarmStep()
-    end
+        farmButton.Text = "Stop Farming"
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        
+        executeResumeFarmStep()
+    end
 end
 
 
 -- Toggle Farm Loop
 local function toggleOreFarmLoop(farmButton)
-    isOreFarmLoopActive = not isOreFarmLoopActive
-    
-    if isOreFarmLoopActive then
-        isWaitingForRockToClear = false
-        farmButton.Text = "Stop Farming"
-        farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-        
-        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if currentRootPart then
-            lastPosition = currentRootPart.Position
-            print("Starting farm manually. Teleporting to initial position...")
-            currentRootPart.CFrame = initialFarmPosition
-            task.wait(0.1)
-            findAndWalkToClosestOre(nil)
-        end
-        timeStationary = 0
-        
-        if not inventoryConnection then
-            inventoryConnection = inventoryFolder.AttributeChanged:Connect(function(attributeName)
-                onInventoryChanged(attributeName, farmButton)
-            end)
-        end
-        
-        task.spawn(function()
-            task.wait(0.5)
-            onInventoryChanged("Rock", farmButton)
-        end)
-        
-    else
-        isWaitingForRockToClear = false
-        farmButton.Text = "Farm Ore"
-        farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        
-        if inventoryConnection then
-            inventoryConnection:Disconnect()
-            inventoryConnection = nil
-        end
-    end
+    isOreFarmLoopActive = not isOreFarmLoopActive
+    
+    if isOreFarmLoopActive then
+        isWaitingForRockToClear = false
+        farmButton.Text = "Stop Farming"
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        
+        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if currentRootPart then
+            lastPosition = currentRootPart.Position
+            print("Starting farm manually. Teleporting to initial position...")
+            currentRootPart.CFrame = initialFarmPosition
+            task.wait(0.1)
+            findAndWalkToClosestOre(nil)
+        end
+        timeStationary = 0
+        
+        if not inventoryConnection then
+            inventoryConnection = inventoryFolder.AttributeChanged:Connect(function(attributeName)
+                onInventoryChanged(attributeName, farmButton)
+            end)
+        end
+        
+        task.spawn(function()
+            task.wait(0.5)
+            onInventoryChanged("Rock", farmButton)
+        end)
+        
+    else
+        isWaitingForRockToClear = false
+        farmButton.Text = "Farm Ore"
+        farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+        
+        if inventoryConnection then
+            inventoryConnection:Disconnect()
+            inventoryConnection = nil
+        end
+    end
 end
 
--- Buy/Sell/Warp Functions
+-- Buy/Sell/Walk Functions
 local function buyFood()
-    if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
-    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart then return end
-    currentRootPart.CFrame = CFrame.new(3000, 16, 2280)
-    task.wait(0.2)
-    NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
-    task.wait(0.2)
-    NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
+    if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
+    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not currentRootPart then return end
+    currentRootPart.CFrame = CFrame.new(3000, 16, 2280)
+    task.wait(0.2)
+    NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
+    task.wait(0.2)
+    NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- [MODIFIED] Function to warp to the sell point
-local function warpToSellPoint()
-    local character = LocalPlayer.Character
-    if not character then return end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
+-- Pathfinding walk to sell point
+local function walkToSellPoint()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not (humanoid and rootPart) then return end
 
-    local destination = Vector3.new(2853.1, 14.5, 2108.9)
-    print("Warping to sell point...")
-    rootPart.CFrame = CFrame.new(destination)
+    local destination = Vector3.new(2853.1, 14.5, 2108.9)
+    
+    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+    local path = PathfindingService:CreatePath(agentParameters)
+
+    local success, errorMessage = pcall(function()
+        path:ComputeAsync(rootPart.Position, destination)
+    end)
+
+    if success and path.Status == Enum.PathStatus.Success then
+        print("Path to sell point calculated. Following waypoints...")
+        local waypoints = path:GetWaypoints()
+        
+        local pathBlockedConnection
+        local function onPathBlocked(blockedWaypointIndex)
+            if blockedWaypointIndex < #waypoints then
+                print("Path to sell point blocked. Recalculating...")
+                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                walkToSellPoint() -- Restart the walk
+            end
+        end
+        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+
+        for _, waypoint in ipairs(waypoints) do
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+        end
+        
+        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+        print("Arrived at the sell point.")
+    else
+        warn("Pathfinding to sell point failed: ", errorMessage or "No path found.", "Using direct walk instead.")
+        humanoid:MoveTo(destination)
+    end
 end
 
 local function warpToKealoha()
-    local targetPlayerName = "KealohaWeaver5712"
-    local targetPlayer = Players:FindFirstChild(targetPlayerName)
-    
-    if targetPlayer then
-        print("Found player " .. targetPlayerName .. ". Attempting to teleport.")
-        teleportToPlayerObject(targetPlayer)
-    else
-        warn("Player " .. targetPlayerName .. " not found in the game.")
-    end
+    local targetPlayerName = "KealohaWeaver5712"
+    local targetPlayer = Players:FindFirstChild(targetPlayerName)
+    
+    if targetPlayer then
+        print("Found player " .. targetPlayerName .. ". Attempting to teleport.")
+        teleportToPlayerObject(targetPlayer)
+    else
+        warn("Player " .. targetPlayerName .. " not found in the game.")
+    end
 end
 
 -- =============================================
@@ -623,76 +671,76 @@ setupDiamondCounter(diamondCountLabel)
 
 -- Update Loop
 RunService.RenderStepped:Connect(function(deltaTime)
-    if HumanoidRootPart and not isCollapsed then
-        local pos = HumanoidRootPart.Position
-        UIElements.CoordinateLabel.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", pos.X, pos.Y, pos.Z)
-    end
-    if not isOreFarmLoopActive or not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return end
-    
-    local currentPos = LocalPlayer.Character.HumanoidRootPart.Position
-    local isStationary = (currentPos - lastPosition).Magnitude < 0.5
+    if HumanoidRootPart and not isCollapsed then
+        local pos = HumanoidRootPart.Position
+        UIElements.CoordinateLabel.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", pos.X, pos.Y, pos.Z)
+    end
+    if not isOreFarmLoopActive or not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return end
+    
+    local currentPos = LocalPlayer.Character.HumanoidRootPart.Position
+    local isStationary = (currentPos - lastPosition).Magnitude < 0.5
 
-    -- General Anti-Stuck Logic
-    if isStationary then
-        timeStationary += deltaTime
-    else
-        timeStationary = 0
-        lastPosition = currentPos
-    end
-    
-    if timeStationary >= antiStuckThreshold then
-        print("Anti-Stuck Triggered (General). Re-pathing...")
-        findAndWalkToClosestOre(nil) -- [MODIFIED] Call new function
-        timeStationary = 0
-        timeAtOreStationary = 0 -- [NEW] Reset ore timer as well
-    end
+    -- General Anti-Stuck Logic
+    if isStationary then
+        timeStationary += deltaTime
+    else
+        timeStationary = 0
+        lastPosition = currentPos
+    end
+    
+    if timeStationary >= antiStuckThreshold then
+        print("Anti-Stuck Triggered (General). Re-pathing...")
+        findAndWalkToClosestOre(nil) -- [MODIFIED] Call new function
+        timeStationary = 0
+        timeAtOreStationary = 0 -- [NEW] Reset ore timer as well
+    end
 
-    -- [NEW] Ore-specific Anti-Stuck Logic
-    if currentTargetOre and currentTargetOre.Parent then
-        local distToTarget = (currentPos - currentTargetOre.WorldPivot.Position).Magnitude
+    -- [NEW] Ore-specific Anti-Stuck Logic
+    if currentTargetOre and currentTargetOre.Parent then
+        local distToTarget = (currentPos - currentTargetOre.WorldPivot.Position).Magnitude
 
-        if isStationary and distToTarget <= distanceToOreThreshold then
-            timeAtOreStationary += deltaTime
-            
-            if timeAtOreStationary >= antiStuckAtOreThreshold then
-                print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
-                findAndWalkToClosestOre(currentTargetOre) -- Find next ore, excluding the current one
-                timeStationary = 0 -- Reset both timers
-                timeAtOreStationary = 0
-            end
-        else
-            -- If player moves or is far from the ore, reset the ore-specific timer
-            timeAtOreStationary = 0
-        end
-    else
-        -- If there's no target ore, this timer should be zero
-        timeAtOreStationary = 0
-    end
+        if isStationary and distToTarget <= distanceToOreThreshold then
+            timeAtOreStationary += deltaTime
+            
+            if timeAtOreStationary >= antiStuckAtOreThreshold then
+                print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
+                findAndWalkToClosestOre(currentTargetOre) -- Find next ore, excluding the current one
+                timeStationary = 0 -- Reset both timers
+                timeAtOreStationary = 0
+            end
+        else
+            -- If player moves or is far from the ore, reset the ore-specific timer
+            timeAtOreStationary = 0
+        end
+    else
+        -- If there's no target ore, this timer should be zero
+        timeAtOreStationary = 0
+    end
 end)
 
 -- UI Interactions
 local function toggleCollapse()
-    isCollapsed = not isCollapsed
-    local targetSize = isCollapsed and UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 30) or originalSize
+    isCollapsed = not isCollapsed
+    local targetSize = isCollapsed and UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 30) or originalSize
 
-    local contentContainer = ControlPanelFrame:FindFirstChild("ContentContainer")
-    local tabContainer = ControlPanelFrame:FindFirstChild("TabContainer")
+    local contentContainer = ControlPanelFrame:FindFirstChild("ContentContainer")
+    local tabContainer = ControlPanelFrame:FindFirstChild("TabContainer")
 
-    if contentContainer then contentContainer.Visible = not isCollapsed end
-    if tabContainer then tabContainer.Visible = not isCollapsed end
+    if contentContainer then contentContainer.Visible = not isCollapsed end
+    if tabContainer then tabContainer.Visible = not isCollapsed end
 
-    UIElements.CollapseButton.Text = isCollapsed and "+" or "–"
-    TweenService:Create(ControlPanelFrame, tweenInfo, {Size = targetSize}):Play()
+    UIElements.CollapseButton.Text = isCollapsed and "+" or "–"
+    TweenService:Create(ControlPanelFrame, tweenInfo, {Size = targetSize}):Play()
 end
 
 local function switchTab(tabName)
-    local isControls = (tabName == "Controls")
-    UIElements.ControlsContentFrame.Visible = isControls
-    UIElements.PlayersContentFrame.Visible = not isControls
-    UIElements.ControlsTabButton.BackgroundColor3 = isControls and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(40, 40, 50)
-    UIElements.ControlsTabButton.TextColor3 = isControls and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-    UIElements.PlayersTabButton.BackgroundColor3 = not isControls and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(40, 40, 50)
-    UIElements.PlayersTabButton.TextColor3 = not isControls and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    local isControls = (tabName == "Controls")
+    UIElements.ControlsContentFrame.Visible = isControls
+    UIElements.PlayersContentFrame.Visible = not isControls
+    UIElements.ControlsTabButton.BackgroundColor3 = isControls and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(40, 40, 50)
+    UIElements.ControlsTabButton.TextColor3 = isControls and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    UIElements.PlayersTabButton.BackgroundColor3 = not isControls and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(40, 40, 50)
+    UIElements.PlayersTabButton.TextColor3 = not isControls and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
 end
 
 UIElements.CollapseButton.MouseButton1Click:Connect(toggleCollapse)
@@ -701,50 +749,51 @@ UIElements.PlayersTabButton.MouseButton1Click:Connect(function() switchTab("Play
 UIElements.TeleportButton.MouseButton1Click:Connect(function() teleportPlayer(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
-UIElements.WarpToSellButton.MouseButton1Click:Connect(warpToSellPoint) -- [MODIFIED] Connected to the new warp function
+UIElements.WalkToSellButton.MouseButton1Click:Connect(walkToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
 
 
 -- [NEW] Keybind to toggle the main control panel
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    -- If the user is typing in a textbox, don't toggle the UI
-    if gameProcessedEvent then return end
+    -- If the user is typing in a textbox, don't toggle the UI
+    if gameProcessedEvent then return end
 
-    if input.KeyCode == Enum.KeyCode.F then
-        -- Toggle the Enabled property of the ScreenGui to show/hide it
-        UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
-    end
+    if input.KeyCode == Enum.KeyCode.F then
+        -- Toggle the Enabled property of the ScreenGui to show/hide it
+        UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
+    end
 end)
 
 
 -- Auto-Eat/Drink Loop
 if NetworkEvent then
-    task.spawn(function()
-        while true do
-            task.wait(1200) -- 20 minutes
-            if LocalPlayer.Character then
-                NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
-                task.wait(10)
-                NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
-            end
-        end
-    end)
+    task.spawn(function()
+        while true do
+            task.wait(1200) -- 20 minutes
+            if LocalPlayer.Character then
+                NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
+                task.wait(10)
+                NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
+            end
+        end
+    end)
 end
 
--- [MODIFIED] Anti-AFK Loop with Jump Simulation
+-- [NEW] Anti-AFK Loop to prevent being kicked for inactivity
 task.spawn(function()
-    local keyToPress = Enum.KeyCode.Space
-    while true do
-        task.wait(300) -- Every 5 minutes
-        
-        -- This simulates a brief spacebar press to jump, signaling activity to the server.
-        pcall(function()
-            VirtualInputManager:SendKeyEvent(true, keyToPress, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, keyToPress, false, game)
-            print("Anti-AFK: Correctly simulated a key press at " .. os.date("%X"))
-        end)
-    end
+    local VirtualUser = game:GetService("VirtualUser")
+    while true do
+        task.wait(240) -- Every 4 minutes, a safe interval to prevent AFK kick
+        
+        -- This simulates a brief keyboard press which signals activity to the server.
+        pcall(function()
+			VirtualUser:CaptureController()
+			VirtualUser:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+			task.wait(0.1)
+			VirtualUser:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+			print("Anti-AFK action performed to prevent disconnection.")
+		end)
+    end
 end)
 
 
@@ -753,15 +802,15 @@ Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 local characterFolder = Workspace:FindFirstChild("Character")
 if characterFolder then
-    characterFolder.ChildAdded:Connect(updatePlayerList)
-    characterFolder.ChildRemoved:Connect(updatePlayerList)
+    characterFolder.ChildAdded:Connect(updatePlayerList)
+    characterFolder.ChildRemoved:Connect(updatePlayerList)
 end
 Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "Character" then
-        child.ChildAdded:Connect(updatePlayerList)
-        child.ChildRemoved:Connect(updatePlayerList)
-        updatePlayerList()
-    end
+    if child.Name == "Character" then
+        child.ChildAdded:Connect(updatePlayerList)
+        child.ChildRemoved:Connect(updatePlayerList)
+        updatePlayerList()
+    end
 end)
 
 -- Initial population
@@ -769,8 +818,8 @@ updatePlayerList()
 
 -- Re-establish character parts on respawn
 LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    Character = char
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.4 Jump Anti-AFK & Warp to Sell] 🛠️💎")
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.3 Anti-AFK] 🛠️💎")
