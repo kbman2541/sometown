@@ -1,15 +1,16 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.3 (Anti-AFK Feature)
+    Version: 3.4 (Jump Anti-AFK & Warp to Sell)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.3:
-    - Added an anti-AFK feature to prevent disconnection from the server during inactivity.
+    Update v3.4:
+    - Replaced the anti-AFK system with a spacebar jump simulation to prevent disconnection.
+    - Changed the "Walk to Sell" function to an instant "Warp to Sell" for faster transactions.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -30,6 +31,7 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Added for new Anti-AFK
 
 -- =============================================
 -- [MODIFIED] Make workspace.Folder cleanup more robust
@@ -272,8 +274,8 @@ local function createControlPanelUI()
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
     local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local WalkToSellButton = Instance.new("TextButton"); WalkToSellButton.Name = "WalkToSellButton"; WalkToSellButton.Size = UDim2.new(1, -20, 0, 30); WalkToSellButton.Position = UDim2.new(0, 10, 0, 160); WalkToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WalkToSellButton.Font = Enum.Font.SourceSansBold; WalkToSellButton.Text = "เดินไปจุดขาย"; WalkToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToSellButton.TextSize = 16; WalkToSellButton.Parent = ControlsContentFrame
-    local UICorner_WalkSellBtn = Instance.new("UICorner", WalkToSellButton); UICorner_WalkSellBtn.CornerRadius = UDim.new(0, 6)
+    local WarpToSellButton = Instance.new("TextButton"); WarpToSellButton.Name = "WarpToSellButton"; WarpToSellButton.Size = UDim2.new(1, -20, 0, 30); WarpToSellButton.Position = UDim2.new(0, 10, 0, 160); WarpToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WarpToSellButton.Font = Enum.Font.SourceSansBold; WarpToSellButton.Text = "วาปไปจุดขาย"; WarpToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToSellButton.TextSize = 16; WarpToSellButton.Parent = ControlsContentFrame
+    local UICorner_WarpSellBtn = Instance.new("UICorner", WarpToSellButton); UICorner_WarpSellBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
@@ -290,7 +292,7 @@ local function createControlPanelUI()
         TeleportButton = TeleportButton,
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
-        WalkToSellButton = WalkToSellButton,
+        WarpToSellButton = WarpToSellButton,
         WarpToKealohaButton = WarpToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
@@ -316,7 +318,7 @@ local antiStuckThreshold = 5
 local currentTargetOre = nil
 local timeAtOreStationary = 0
 local antiStuckAtOreThreshold = 10 -- User-defined 10 seconds
-local distanceToOreThreshold = 3   -- User-defined 3 studs distance
+local distanceToOreThreshold = 3     -- User-defined 3 studs distance
 
 -- [MERGED] Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
@@ -407,7 +409,7 @@ local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added paramet
 
         if success and path.Status == Enum.PathStatus.Success then
             print("Path calculated. Following waypoints...")
-            local waypoints = path:GetWaypoints()
+            local waypoints = path:Getwaypoints()
             
             local pathBlockedConnection
             local function onPathBlocked(blockedWaypointIndex)
@@ -573,7 +575,7 @@ local function toggleOreFarmLoop(farmButton)
     end
 end
 
--- Buy/Sell/Walk Functions
+-- Buy/Sell/Warp Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
     local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -585,48 +587,16 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- Pathfinding walk to sell point
-local function walkToSellPoint()
+-- [MODIFIED] Function to warp to the sell point
+local function warpToSellPoint()
     local character = LocalPlayer.Character
     if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
     local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not (humanoid and rootPart) then return end
+    if not rootPart then return end
 
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
-    
-    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
-    local path = PathfindingService:CreatePath(agentParameters)
-
-    local success, errorMessage = pcall(function()
-        path:ComputeAsync(rootPart.Position, destination)
-    end)
-
-    if success and path.Status == Enum.PathStatus.Success then
-        print("Path to sell point calculated. Following waypoints...")
-        local waypoints = path:GetWaypoints()
-        
-        local pathBlockedConnection
-        local function onPathBlocked(blockedWaypointIndex)
-            if blockedWaypointIndex < #waypoints then
-                print("Path to sell point blocked. Recalculating...")
-                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                walkToSellPoint() -- Restart the walk
-            end
-        end
-        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
-
-        for _, waypoint in ipairs(waypoints) do
-            humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
-        end
-        
-        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-        print("Arrived at the sell point.")
-    else
-        warn("Pathfinding to sell point failed: ", errorMessage or "No path found.", "Using direct walk instead.")
-        humanoid:MoveTo(destination)
-    end
+    print("Warping to sell point...")
+    rootPart.CFrame = CFrame.new(destination)
 end
 
 local function warpToKealoha()
@@ -731,7 +701,7 @@ UIElements.PlayersTabButton.MouseButton1Click:Connect(function() switchTab("Play
 UIElements.TeleportButton.MouseButton1Click:Connect(function() teleportPlayer(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
-UIElements.WalkToSellButton.MouseButton1Click:Connect(walkToSellPoint)
+UIElements.WarpToSellButton.MouseButton1Click:Connect(warpToSellPoint) -- [MODIFIED] Connected to the new warp function
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
 
 
@@ -761,20 +731,19 @@ if NetworkEvent then
     end)
 end
 
--- [NEW] Anti-AFK Loop to prevent being kicked for inactivity
+-- [MODIFIED] Anti-AFK Loop with Jump Simulation
 task.spawn(function()
-    local VirtualUser = game:GetService("VirtualUser")
+    local keyToPress = Enum.KeyCode.Space
     while true do
-        task.wait(240) -- Every 4 minutes, a safe interval to prevent AFK kick
+        task.wait(300) -- Every 5 minutes
         
-        -- This simulates a brief keyboard press which signals activity to the server.
+        -- This simulates a brief spacebar press to jump, signaling activity to the server.
         pcall(function()
-			VirtualUser:CaptureController()
-			VirtualUser:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
-			task.wait(0.1)
-			VirtualUser:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
-			print("Anti-AFK action performed to prevent disconnection.")
-		end)
+            VirtualInputManager:SendKeyEvent(true, keyToPress, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, keyToPress, false, game)
+            print("Anti-AFK: Correctly simulated a key press at " .. os.date("%X"))
+        end)
     end
 end)
 
@@ -804,5 +773,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.3 Anti-AFK] 🛠️💎")
-
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.4 Jump Anti-AFK & Warp to Sell] 🛠️💎")
