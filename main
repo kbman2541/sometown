@@ -1,11 +1,3 @@
--- ===================================================================
--- ## AKB MASTER UI - (TP + Item Loop + Auto Farm + Player TP) - v4.0 ##
--- ##             Merged by Gemini for AKB Akibus Shop              ##
--- ===================================================================
-
--- ###################################################################
--- ## SECTION 0: SERVICES & CORE SETUP
--- ###################################################################
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
