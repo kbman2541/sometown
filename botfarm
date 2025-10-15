@@ -1,15 +1,16 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.3 (Anti-AFK Feature)
+    Version: 3.4 (Auto-Farm & Input Sim Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count from their Inventory attributes.
 
-    Update v3.3:
-    - Added an anti-AFK feature to prevent disconnection from the server during inactivity.
+    Update v3.4:
+    - Added auto-start for the ore farming loop upon joining the game.
+    - Modified the Anti-AFK simulation to press the '1' key and the 'Shift' key.
 
     Installation:
     Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
@@ -161,7 +162,7 @@ end
 -- UI Creation Functions
 -- =============================================
 
--- [MERGED] Diamond Counter UI Creation (Fixed Size and Position)
+-- [MERGED & EDITED] Diamond Counter UI Creation (Moved to the Right)
 local function createDiamondCounterUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ItemCounterGui"
@@ -173,7 +174,8 @@ local function createDiamondCounterUI()
     shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
     shadowFrame.BackgroundTransparency = 0.6
     shadowFrame.BorderSizePixel = 0
-    shadowFrame.Position = UDim2.new(0, 15 + 3, 0, 15 + 3) 
+    shadowFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
+    shadowFrame.Position = UDim2.new(1, -15 + 3, 0, 15 + 3) -- Position from right edge
     shadowFrame.Size = UDim2.new(0, 220, 0, 60)
     shadowFrame.ZIndex = 1
     shadowFrame.Parent = screenGui
@@ -187,7 +189,8 @@ local function createDiamondCounterUI()
     mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
     mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
     mainFrame.BorderSizePixel = 1
-    mainFrame.Position = UDim2.new(0, 15, 0, 15)
+    mainFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
+    mainFrame.Position = UDim2.new(1, -15, 0, 15) -- Position from right edge
     mainFrame.Size = UDim2.new(0, 220, 0, 60)
     mainFrame.ZIndex = 2
     mainFrame.Parent = screenGui
@@ -316,7 +319,7 @@ local antiStuckThreshold = 5
 local currentTargetOre = nil
 local timeAtOreStationary = 0
 local antiStuckAtOreThreshold = 10 -- User-defined 10 seconds
-local distanceToOreThreshold = 3   -- User-defined 3 studs distance
+local distanceToOreThreshold = 3     -- User-defined 3 studs distance
 
 -- [MERGED] Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
@@ -770,10 +773,19 @@ task.spawn(function()
         -- This simulates a brief keyboard press which signals activity to the server.
         pcall(function()
 			VirtualUser:CaptureController()
+
+            -- Simulate pressing key '1'
+			VirtualUser:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+			task.wait(0.1)
+			VirtualUser:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+			task.wait(0.5) -- Wait a bit before the next key
+
+            -- Simulate pressing Left Shift
 			VirtualUser:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
 			task.wait(0.1)
 			VirtualUser:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
-			print("Anti-AFK action performed to prevent disconnection.")
+			
+			print("Anti-AFK action performed (1 + Shift) to prevent disconnection.")
 		end)
     end
 end)
@@ -804,7 +816,12 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.3 Anti-AFK] 🛠️💎")
+print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.4 Auto-Farm & Input Sim Update] 🛠️💎")
+
+-- [NEW] Auto-start the farm loop after a short delay
+task.wait(2) -- Wait a couple of seconds for the game to fully load
+print("Auto-starting farm loop...")
+toggleOreFarmLoop(UIElements.FarmOreButton)
 
 --[[
     คำเตือน: สคริปต์นี้เป็นเพียงตัวอย่างแนวคิดเพื่อการศึกษาเท่านั้น
@@ -836,3 +853,4 @@ while true do
     
     print("Anti-AFK: Correctly simulated a key press at " .. os.date("%X"))
 end
+
