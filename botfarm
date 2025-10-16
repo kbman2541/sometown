@@ -1,12 +1,17 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 4.4 (Death Recovery Update)
+    Version: 4.5 (Attribute Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count.
+
+    Update v4.5:
+    - Reworked the auto eat/drink system to use Attributes ("Hunger", "Thirsty")
+      on the Player's "Status" folder instead of legacy Value objects. This aligns
+      with modern Roblox development practices.
 
     Update v4.4:
     - Added a death recovery system. When the player's health reaches 0, the script will:
@@ -762,30 +767,30 @@ end)
 
 
 --[[
-    [ปรับปรุงใหม่] ระบบกินอาหาร/น้ำดื่มอัตโนมัติแบบอัจฉริยะ
-    ลูปนี้จะคอยตรวจสอบค่าสถานะของผู้เล่น และจะใช้ไอเทมก็ต่อเมื่อจำเป็นเท่านั้น
+    [อัปเดต] ระบบกินอาหาร/น้ำดื่มอัตโนมัติโดยใช้ Attributes
+    ลูปนี้จะคอยตรวจสอบค่าสถานะ Attributes ของผู้เล่น และจะใช้ไอเทมก็ต่อเมื่อจำเป็นเท่านั้น
 ]]
 task.spawn(function()
-    if not NetworkEvent then 
+    if not NetworkEvent then
         warn("NetworkEvent not found for Smart Auto-Eat loop.")
-        return 
+        return
     end
 
     while task.wait(5) do -- ตรวจสอบทุกๆ 5 วินาที
         local statusFolder = LocalPlayer:FindFirstChild("Status")
         if statusFolder then
-            -- ตรวจสอบค่าความหิว (Hunger)
-            local hunger = statusFolder:FindFirstChild("Hunger")
-            if hunger and hunger.Value <= 70 then
-                print("Hunger is low (" .. string.format("%.2f", hunger.Value) .. "), eating bread.")
+            -- ตรวจสอบค่าความหิว (Hunger) จาก Attribute
+            local hungerValue = statusFolder:GetAttribute("Hunger")
+            if hungerValue and hungerValue <= 70 then
+                print("Hunger is low (" .. string.format("%.2f", hungerValue) .. "), eating bread.")
                 NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
                 task.wait(2) -- หน่วงเวลาเล็กน้อยหลังกิน
             end
 
-            -- ตรวจสอบค่าความกระหาย (Thirsty)
-            local thirsty = statusFolder:FindFirstChild("Thirsty")
-            if thirsty and thirsty.Value <= 70 then
-                 print("Thirsty is low (" .. string.format("%.2f", thirsty.Value) .. "), drinking water.")
+            -- ตรวจสอบค่าความกระหาย (Thirsty) จาก Attribute
+            local thirstyValue = statusFolder:GetAttribute("Thirsty")
+            if thirstyValue and thirstyValue <= 70 then
+                print("Thirsty is low (" .. string.format("%.2f", thirstyValue) .. "), drinking water.")
                 NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
                 task.wait(2) -- หน่วงเวลาเล็กน้อยหลังดื่ม
             end
