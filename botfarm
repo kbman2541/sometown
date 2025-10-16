@@ -1,19 +1,17 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 3.4 (Auto-Farm & Input Sim Update)
+    Version: 4.3 (Initial Press Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
-    element to display the player's "Diamond" count from their Inventory attributes.
+    element to display the player's "Diamond" count.
 
-    Update v3.4:
-    - Added auto-start for the ore farming loop upon joining the game.
-    - Modified the Anti-AFK simulation to press the '1' key and the 'Shift' key.
-
-    Installation:
-    Place this LocalScript inside StarterPlayer > StarterPlayerScripts.
+    Update v4.3:
+    - Added a one-time key press ('1' + 'Shift') that triggers automatically after the script loads.
+    - The auto-farm sequence now begins after this initial key press.
+    - The periodic Anti-AFK loop remains active to prevent disconnection.
 ]]
 
 -- =============================================
@@ -275,8 +273,8 @@ local function createControlPanelUI()
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
     local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local WalkToSellButton = Instance.new("TextButton"); WalkToSellButton.Name = "WalkToSellButton"; WalkToSellButton.Size = UDim2.new(1, -20, 0, 30); WalkToSellButton.Position = UDim2.new(0, 10, 0, 160); WalkToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); WalkToSellButton.Font = Enum.Font.SourceSansBold; WalkToSellButton.Text = "เดินไปจุดขาย"; WalkToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToSellButton.TextSize = 16; WalkToSellButton.Parent = ControlsContentFrame
-    local UICorner_WalkSellBtn = Instance.new("UICorner", WalkToSellButton); UICorner_WalkSellBtn.CornerRadius = UDim.new(0, 6)
+    local TeleportToSellButton = Instance.new("TextButton"); TeleportToSellButton.Name = "TeleportToSellButton"; TeleportToSellButton.Size = UDim2.new(1, -20, 0, 30); TeleportToSellButton.Position = UDim2.new(0, 10, 0, 160); TeleportToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); TeleportToSellButton.Font = Enum.Font.SourceSansBold; TeleportToSellButton.Text = "จุดขาย"; TeleportToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportToSellButton.TextSize = 16; TeleportToSellButton.Parent = ControlsContentFrame
+    local UICorner_TeleportSellBtn = Instance.new("UICorner", TeleportToSellButton); UICorner_TeleportSellBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
@@ -293,7 +291,7 @@ local function createControlPanelUI()
         TeleportButton = TeleportButton,
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
-        WalkToSellButton = WalkToSellButton,
+        TeleportToSellButton = TeleportToSellButton,
         WarpToKealohaButton = WarpToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
@@ -315,13 +313,12 @@ local isWaitingForRockToClear = false
 local lastPosition = Vector3.new()
 local timeStationary = 0
 local antiStuckThreshold = 5
--- [NEW] State variables for ore-specific anti-stuck
 local currentTargetOre = nil
 local timeAtOreStationary = 0
-local antiStuckAtOreThreshold = 10 -- User-defined 10 seconds
-local distanceToOreThreshold = 3     -- User-defined 3 studs distance
+local antiStuckAtOreThreshold = 10 
+local distanceToOreThreshold = 3
 
--- [MERGED] Logic for Diamond Counter
+-- Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
     if not inventoryFolder then 
         warn("Diamond Counter: Inventory folder not found!")
@@ -369,7 +366,7 @@ local function getObjectsToTrack()
 end
 
 -- Pathfinding walk function
-local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added parameter
+local function findAndWalkToClosestOre(oreToExclude)
     local character = LocalPlayer.Character
     if not character then return end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -382,13 +379,12 @@ local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added paramet
     local objectsToTrack = getObjectsToTrack()
     if #objectsToTrack == 0 then
         warn("No objects to track were found. Aborting walk.")
-		currentTargetOre = nil -- [NEW] Reset target ore
+        currentTargetOre = nil
         return
     end
 
     local closestObject, minDistance = nil, math.huge
     for _, obj in ipairs(objectsToTrack) do
-        -- [MODIFIED] Check if the object is valid and not the one to exclude
         if obj and obj.Parent and obj ~= oreToExclude then
             local dist = (rootPart.Position - obj.WorldPivot.Position).Magnitude
             if dist < minDistance then
@@ -398,7 +394,7 @@ local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added paramet
     end
 
     if closestObject then
-		currentTargetOre = closestObject -- [NEW] Set the new target ore
+        currentTargetOre = closestObject
         print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
         
         local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
@@ -438,7 +434,7 @@ local function findAndWalkToClosestOre(oreToExclude) -- [MODIFIED] Added paramet
             humanoid:MoveTo(closestObject.WorldPivot.Position)
         end
     else
-		currentTargetOre = nil -- [NEW] Reset if no object is found
+        currentTargetOre = nil
         warn("Could not find any valid objects to walk to (excluding current target).")
     end
 end
@@ -588,48 +584,17 @@ local function buyFood()
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
--- Pathfinding walk to sell point
-local function walkToSellPoint()
+local function teleportToSellPoint()
     local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not (humanoid and rootPart) then return end
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        print("Teleport to sell point failed: HumanoidRootPart not found.")
+        return
+    end
 
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
-    
-    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
-    local path = PathfindingService:CreatePath(agentParameters)
-
-    local success, errorMessage = pcall(function()
-        path:ComputeAsync(rootPart.Position, destination)
-    end)
-
-    if success and path.Status == Enum.PathStatus.Success then
-        print("Path to sell point calculated. Following waypoints...")
-        local waypoints = path:GetWaypoints()
-        
-        local pathBlockedConnection
-        local function onPathBlocked(blockedWaypointIndex)
-            if blockedWaypointIndex < #waypoints then
-                print("Path to sell point blocked. Recalculating...")
-                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                walkToSellPoint() -- Restart the walk
-            end
-        end
-        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
-
-        for _, waypoint in ipairs(waypoints) do
-            humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
-        end
-        
-        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-        print("Arrived at the sell point.")
-    else
-        warn("Pathfinding to sell point failed: ", errorMessage or "No path found.", "Using direct walk instead.")
-        humanoid:MoveTo(destination)
-    end
+    print("Teleporting to sell point...")
+    rootPart.CFrame = CFrame.new(destination + Vector3.new(0, 3, 0))
 end
 
 local function warpToKealoha()
@@ -675,12 +640,12 @@ RunService.RenderStepped:Connect(function(deltaTime)
     
     if timeStationary >= antiStuckThreshold then
         print("Anti-Stuck Triggered (General). Re-pathing...")
-        findAndWalkToClosestOre(nil) -- [MODIFIED] Call new function
+        findAndWalkToClosestOre(nil)
         timeStationary = 0
-        timeAtOreStationary = 0 -- [NEW] Reset ore timer as well
+        timeAtOreStationary = 0
     end
 
-    -- [NEW] Ore-specific Anti-Stuck Logic
+    -- Ore-specific Anti-Stuck Logic
     if currentTargetOre and currentTargetOre.Parent then
         local distToTarget = (currentPos - currentTargetOre.WorldPivot.Position).Magnitude
 
@@ -689,16 +654,14 @@ RunService.RenderStepped:Connect(function(deltaTime)
             
             if timeAtOreStationary >= antiStuckAtOreThreshold then
                 print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
-                findAndWalkToClosestOre(currentTargetOre) -- Find next ore, excluding the current one
-                timeStationary = 0 -- Reset both timers
+                findAndWalkToClosestOre(currentTargetOre)
+                timeStationary = 0
                 timeAtOreStationary = 0
             end
         else
-            -- If player moves or is far from the ore, reset the ore-specific timer
             timeAtOreStationary = 0
         end
     else
-        -- If there's no target ore, this timer should be zero
         timeAtOreStationary = 0
     end
 end)
@@ -734,122 +697,93 @@ UIElements.PlayersTabButton.MouseButton1Click:Connect(function() switchTab("Play
 UIElements.TeleportButton.MouseButton1Click:Connect(function() teleportPlayer(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
-UIElements.WalkToSellButton.MouseButton1Click:Connect(walkToSellPoint)
+UIElements.TeleportToSellButton.MouseButton1Click:Connect(teleportToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
 
 
--- [NEW] Keybind to toggle the main control panel
+-- Keybind to toggle the main control panel
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    -- If the user is typing in a textbox, don't toggle the UI
     if gameProcessedEvent then return end
 
     if input.KeyCode == Enum.KeyCode.F then
-        -- Toggle the Enabled property of the ScreenGui to show/hide it
         UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
     end
 end)
 
 
--- Auto-Eat/Drink Loop
-if NetworkEvent then
-    task.spawn(function()
-        while true do
-            task.wait(1200) -- 20 minutes
-            if LocalPlayer.Character then
+--[[
+    [ปรับปรุงใหม่] ระบบกินอาหาร/น้ำดื่มอัตโนมัติแบบอัจฉริยะ
+    ลูปนี้จะคอยตรวจสอบค่าสถานะของผู้เล่น และจะใช้ไอเทมก็ต่อเมื่อจำเป็นเท่านั้น
+]]
+task.spawn(function()
+    if not NetworkEvent then 
+        warn("NetworkEvent not found for Smart Auto-Eat loop.")
+        return 
+    end
+
+    while task.wait(5) do -- ตรวจสอบทุกๆ 5 วินาที
+        local statusFolder = LocalPlayer:FindFirstChild("Status")
+        if statusFolder then
+            -- ตรวจสอบค่าความหิว (Hunger)
+            local hunger = statusFolder:FindFirstChild("Hunger")
+            if hunger and hunger.Value <= 70 then
+                print("Hunger is low (" .. string.format("%.2f", hunger.Value) .. "), eating bread.")
                 NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
-                task.wait(10)
+                task.wait(2) -- หน่วงเวลาเล็กน้อยหลังกิน
+            end
+
+            -- ตรวจสอบค่าความกระหาย (Thirsty)
+            local thirsty = statusFolder:FindFirstChild("Thirsty")
+            if thirsty and thirsty.Value <= 70 then
+                 print("Thirsty is low (" .. string.format("%.2f", thirsty.Value) .. "), drinking water.")
                 NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
+                task.wait(2) -- หน่วงเวลาเล็กน้อยหลังดื่ม
             end
         end
-    end)
-end
+    end
+end)
 
--- [NEW] Anti-AFK Loop to prevent being kicked for inactivity
+
+-- Anti-AFK Loop to prevent being kicked for inactivity
 task.spawn(function()
-    local VirtualUser = game:GetService("VirtualUser")
+    task.wait(60)
+    local VirtualInputManager = game:GetService("VirtualInputManager")
     while true do
-        task.wait(240) -- Every 4 minutes, a safe interval to prevent AFK kick
-        
-        -- This simulates a brief keyboard press which signals activity to the server.
+        task.wait(240) -- Every 4 minutes
         pcall(function()
-			VirtualUser:CaptureController()
-
-            -- Simulate pressing key '1'
-			VirtualUser:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-			task.wait(0.1)
-			VirtualUser:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-			task.wait(0.5) -- Wait a bit before the next key
+            -- Simulate pressing '1'
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+            task.wait(0.5) -- Wait a bit before the next key
 
             -- Simulate pressing Left Shift
-			VirtualUser:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
-			task.wait(0.1)
-			VirtualUser:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
-			
-			print("Anti-AFK action performed (1 + Shift) to prevent disconnection.")
-		end)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+            
+            print("Anti-AFK action performed (1 + Shift) to prevent disconnection.")
+        end)
     end
 end)
 
-
--- Player List Update Connections
-Players.PlayerAdded:Connect(updatePlayerList)
-Players.PlayerRemoving:Connect(updatePlayerList)
-local characterFolder = Workspace:FindFirstChild("Character")
-if characterFolder then
-    characterFolder.ChildAdded:Connect(updatePlayerList)
-    characterFolder.ChildRemoved:Connect(updatePlayerList)
-end
-Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "Character" then
-        child.ChildAdded:Connect(updatePlayerList)
-        child.ChildRemoved:Connect(updatePlayerList)
-        updatePlayerList()
-    end
+-- [NEW] Perform a one-time key press when the script starts
+task.wait(5) -- Wait 5 seconds for the game to load before pressing keys
+print("Performing one-time key press (1 + Shift)...")
+pcall(function()
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    -- Simulate pressing '1'
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+    task.wait(0.5)
+    -- Simulate pressing Left Shift
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+    print("One-time key press completed.")
 end)
 
--- Initial population
-updatePlayerList()
-
--- Re-establish character parts on respawn
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-end)
-
-print("Merged Control Panel & Diamond Counter UI Loaded Successfully. [v3.4 Auto-Farm & Input Sim Update] 🛠️💎")
-
--- [NEW] Auto-start the farm loop after a short delay
-task.wait(2) -- Wait a couple of seconds for the game to fully load
+-- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
-
---[[
-    คำเตือน: สคริปต์นี้เป็นเพียงตัวอย่างแนวคิดเพื่อการศึกษาเท่านั้น
-    การใช้งานจริงอาจผิดกฎของเกมและนำไปสู่การถูกแบนได้
-]]
-
--- Service ที่ใช้จำลอง Input โดยเฉพาะ
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
--- ปุ่มที่ต้องการจำลอง
-local keyToPress = Enum.KeyCode.Space
-
-while true do
-    -- รอ 300 วินาที
-    task.wait(300)
-
-    -- --- ส่วนที่แก้ไข ---
-    -- ใช้ VirtualInputManager เพื่อส่งสัญญาณการกดปุ่ม
-    
-    -- 1. ส่งสัญญาณว่าปุ่มถูก "กดลง" (KeyDown)
-    -- SendKeyEvent(isDown, keyCode, modifiers, gameProcessedEvent)
-    VirtualInputManager:SendKeyEvent(true, keyToPress, false, game)
-
-    -- หน่วงเวลาเล็กน้อย
-    task.wait(0.1)
-
-    -- 2. ส่งสัญญาณว่าปุ่มถูก "ปล่อย" (KeyUp)
-    VirtualInputManager:SendKeyEvent(false, keyToPress, false, game)
-    
-    print("Anti-AFK: Correctly simulated a key press at " .. os.date("%X"))
-end
