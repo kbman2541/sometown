@@ -1,19 +1,17 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 4.4 (Death Recovery Update)
+    Version: 4.5 (Stable Inventory Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count.
 
-    Update v4.4:
-    - Added a death recovery system. When the player's health reaches 0, the script will:
-        1. Stop the farm loop.
-        2. Wait, then teleport to a safe location (0, -200, 0).
-        3. Wait again, then simulate the initial key press ('1' + 'Shift').
-        4. Automatically restart the farm loop.
+    Update v4.5:
+    - Fixed the "Infinite yield possible" warning for the Inventory folder.
+    - The script now waits a maximum of 15 seconds for the Inventory to load,
+      preventing the script from getting stuck if it fails to appear.
 ]]
 
 -- =============================================
@@ -64,8 +62,14 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local inventoryFolder = LocalPlayer:WaitForChild("Inventory")
+-- [MODIFIED] Added a timeout to WaitForChild to prevent infinite yield
+local inventoryFolder = LocalPlayer:WaitForChild("Inventory", 15) 
 local NetworkEvent
+
+-- Check if inventoryFolder was found
+if not inventoryFolder then
+    warn("CRITICAL: Inventory folder not found after 15 seconds. Features depending on it will be disabled.")
+end
 
 -- Safely get NetworkEvent
 pcall(function()
@@ -325,7 +329,8 @@ local distanceToOreThreshold = 3
 -- Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
     if not inventoryFolder then 
-        warn("Diamond Counter: Inventory folder not found!")
+        warn("Diamond Counter: Inventory folder not found! UI will not function.")
+        countLabel.Text = "ERROR"
         return
     end
 
@@ -553,7 +558,7 @@ local function toggleOreFarmLoop(farmButton)
         end
         timeStationary = 0
         
-        if not inventoryConnection then
+        if not inventoryConnection and inventoryFolder then
             inventoryConnection = inventoryFolder.AttributeChanged:Connect(function(attributeName)
                 onInventoryChanged(attributeName, farmButton)
             end)
