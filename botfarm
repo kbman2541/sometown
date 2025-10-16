@@ -1,17 +1,19 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 4.3 (Initial Press Update)
+    Version: 4.4 (Death Recovery Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count.
 
-    Update v4.3:
-    - Added a one-time key press ('1' + 'Shift') that triggers automatically after the script loads.
-    - The auto-farm sequence now begins after this initial key press.
-    - The periodic Anti-AFK loop remains active to prevent disconnection.
+    Update v4.4:
+    - Added a death recovery system. When the player's health reaches 0, the script will:
+        1. Stop the farm loop.
+        2. Wait, then teleport to a safe location (0, -200, 0).
+        3. Wait again, then simulate the initial key press ('1' + 'Shift').
+        4. Automatically restart the farm loop.
 ]]
 
 -- =============================================
@@ -81,6 +83,8 @@ end)
 -- =============================================
 -- UI Elements (Global Scope)
 -- =============================================
+local UIElements -- จะถูกกำหนดค่าในภายหลัง
+local diamondCountLabel -- จะถูกกำหนดค่าในภายหลัง
 local ControlPanelFrame
 local playerListFrame -- For player teleport list
 
@@ -609,15 +613,61 @@ local function warpToKealoha()
     end
 end
 
+-- [NEW] Death Recovery Function
+local function handleDeathAndRecover()
+    task.spawn(function()
+        if not isOreFarmLoopActive then
+            print("Player died, but farm was not active. No recovery action needed.")
+            return
+        end
+
+        print("DEATH DETECTED! Starting recovery sequence...")
+        toggleOreFarmLoop(UIElements.FarmOreButton)
+        
+        task.wait(3)
+
+        print("Teleporting to recovery point (0, -200, 0)...")
+        local rootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            rootPart.CFrame = CFrame.new(0, -200, 0)
+        else
+            warn("Could not find HumanoidRootPart for recovery teleport.")
+        end
+
+        task.wait(3)
+
+        print("Performing post-recovery key press (1 + Shift)...")
+        pcall(function()
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+            task.wait(0.5)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+            print("Post-recovery key press completed.")
+        end)
+
+        print("Recovery complete. Auto-restarting farm loop...")
+        toggleOreFarmLoop(UIElements.FarmOreButton)
+    end)
+end
+
 -- =============================================
 -- Main Execution & Event Connections
 -- =============================================
 -- Create UIs
-local UIElements = createControlPanelUI()
-local diamondCountLabel = createDiamondCounterUI()
+UIElements = createControlPanelUI()
+diamondCountLabel = createDiamondCounterUI()
 
 -- Setup Logic
 setupDiamondCounter(diamondCountLabel)
+
+-- Connect Death Handler
+local humanoid = Character:WaitForChild("Humanoid")
+humanoid.Died:Connect(handleDeathAndRecover)
+print("Death recovery system connected for initial character.")
 
 -- Update Loop
 RunService.RenderStepped:Connect(function(deltaTime)
@@ -751,20 +801,23 @@ task.spawn(function()
     while true do
         task.wait(240) -- Every 4 minutes
         pcall(function()
-            -- Simulate pressing '1'
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+            -- Simulate pressing Spacebar
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
             task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-            task.wait(0.5) -- Wait a bit before the next key
-
-            -- Simulate pressing Left Shift
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
             
-            print("Anti-AFK action performed (1 + Shift) to prevent disconnection.")
+            print("Anti-AFK action performed (Spacebar) to prevent disconnection.")
         end)
     end
+end)
+
+-- Re-establish character parts on respawn and connect death handler
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    local humanoid = char:WaitForChild("Humanoid")
+    humanoid.Died:Connect(handleDeathAndRecover)
+    print("Death recovery system connected for respawned character.")
 end)
 
 -- [NEW] Perform a one-time key press when the script starts
@@ -787,3 +840,4 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
