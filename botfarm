@@ -1,12 +1,17 @@
 --[[
     Merged Control Panel & UI Script
     Creator: Gemini
-    Version: 4.5 (Attribute Update)
+    Version: 4.6 (Sell Loop Update)
 
     Description:
     This script provides a comprehensive control panel for players, including teleportation,
     automated farming, and player interaction. It also includes a separate, dedicated UI 
     element to display the player's "Diamond" count.
+
+    Update v4.6:
+    - Added a new "Sell Loop" button to the control panel.
+    - This button toggles a loop that repeatedly fires events to sell various economy items.
+    - Adjusted the UI panel's height to accommodate the new button.
 
     Update v4.5:
     - Reworked the auto eat/drink system to use Attributes ("Hunger", "Thirsty")
@@ -243,13 +248,13 @@ local function createControlPanelUI()
 
     -- [NEW] Add UIAspectRatioConstraint to make the UI responsive
     local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
-    AspectRatioConstraint.AspectRatio = 250 / 320
+    AspectRatioConstraint.AspectRatio = 250 / 360 -- Updated for new button
     AspectRatioConstraint.DominantAxis = Enum.DominantAxis.Height
     AspectRatioConstraint.Parent = ScreenGui
 
     -- Main Draggable Frame
     ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; 
-    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 320) -- Using offset for the constraint to work correctly
+    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 360) -- Increased height for new button
     ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0); 
     ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
     ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
@@ -285,6 +290,10 @@ local function createControlPanelUI()
     local TeleportToSellButton = Instance.new("TextButton"); TeleportToSellButton.Name = "TeleportToSellButton"; TeleportToSellButton.Size = UDim2.new(1, -20, 0, 30); TeleportToSellButton.Position = UDim2.new(0, 10, 0, 160); TeleportToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); TeleportToSellButton.Font = Enum.Font.SourceSansBold; TeleportToSellButton.Text = "จุดขาย"; TeleportToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportToSellButton.TextSize = 16; TeleportToSellButton.Parent = ControlsContentFrame
     local UICorner_TeleportSellBtn = Instance.new("UICorner", TeleportToSellButton); UICorner_TeleportSellBtn.CornerRadius = UDim.new(0, 6)
 
+    -- [NEW] Sell Loop Button
+    local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "วนขายของ"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
+    local UICorner_SellLoopBtn = Instance.new("UICorner", SellLoopButton); UICorner_SellLoopBtn.CornerRadius = UDim.new(0, 6)
+
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
     local WarpToKealohaButton = Instance.new("TextButton"); WarpToKealohaButton.Name = "WarpToKealohaButton"; WarpToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WarpToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WarpToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WarpToKealohaButton.Font = Enum.Font.SourceSansBold; WarpToKealohaButton.Text = "วาปหา KealohaWeaver5712"; WarpToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToKealohaButton.TextSize = 16; WarpToKealohaButton.Parent = PlayersContentFrame
@@ -301,6 +310,7 @@ local function createControlPanelUI()
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
         TeleportToSellButton = TeleportToSellButton,
+        SellLoopButton = SellLoopButton, -- Added new button here
         WarpToKealohaButton = WarpToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
@@ -314,7 +324,7 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 320)
+local originalSize = UDim2.new(0, 250, 0, 360) -- Updated size
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local inventoryConnection = nil
@@ -326,6 +336,7 @@ local currentTargetOre = nil
 local timeAtOreStationary = 0
 local antiStuckAtOreThreshold = 10 
 local distanceToOreThreshold = 3
+local isSellLoopActive = false -- State for the new sell loop
 
 -- Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
@@ -571,13 +582,51 @@ local function toggleOreFarmLoop(farmButton)
         
     else
         isWaitingForRockToClear = false
-        farmButton.Text = "Farm Ore"
+        farmButton.Text = "ฟามแร่"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
         if inventoryConnection then
             inventoryConnection:Disconnect()
             inventoryConnection = nil
         end
+    end
+end
+
+-- [NEW] Toggle Sell Loop
+local function toggleSellLoop(button)
+    isSellLoopActive = not isSellLoopActive
+
+    if isSellLoopActive then
+        button.Text = "หยุดขาย"
+        button.BackgroundColor3 = Color3.fromRGB(200, 40, 40) -- Red color for "Stop"
+
+        task.spawn(function()
+            print("Sell loop started.")
+            while isSellLoopActive do
+                if NetworkEvent then
+                    pcall(function()
+                        NetworkEvent:FireServer("fire", nil, "Economy", "Rockfragments", 50)
+                        NetworkEvent:FireServer("fire", nil, "Economy", "Soil", 5)
+                        NetworkEvent:FireServer("fire", nil, "Economy", "Iron", 10)
+                        NetworkEvent:FireServer("fire", nil, "Economy", "Copper", 10)
+                        NetworkEvent:FireServer("fire", nil, "Economy", "Gold", 10)
+                    end)
+                else
+                    warn("Sell Loop: NetworkEvent is not available.")
+                    isSellLoopActive = false -- Stop the loop if the event is missing
+                    break
+                end
+                task.wait(0.5) -- Wait half a second before repeating
+            end
+            -- This part runs after the loop ends
+            if button and button.Parent then
+                button.Text = "วนขายของ"
+                button.BackgroundColor3 = Color3.fromRGB(200, 100, 0) -- Original color
+            end
+            print("Sell loop stopped.")
+        end)
+    else
+        -- The loop will stop on its own when isSellLoopActive becomes false
     end
 end
 
@@ -754,6 +803,8 @@ UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
 UIElements.TeleportToSellButton.MouseButton1Click:Connect(teleportToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
+-- [NEW] Connect the sell loop button
+UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UIElements.SellLoopButton) end)
 
 
 -- Keybind to toggle the main control panel
@@ -820,8 +871,8 @@ end)
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-    local humanoid = char:WaitForChild("Humanoid")
-    humanoid.Died:Connect(handleDeathAndRecover)
+    local newHumanoid = char:WaitForChild("Humanoid")
+    newHumanoid.Died:Connect(handleDeathAndRecover)
     print("Death recovery system connected for respawned character.")
 end)
 
