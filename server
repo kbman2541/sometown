@@ -1,0 +1,69 @@
+--[[
+  สคริปต์นี้จะหาเซิร์ฟเวอร์ที่มีผู้เล่นน้อยที่สุด
+  และเทเลพอร์ตผู้เล่นไปยังเซิร์ฟเวอร์นั้น
+]]
+
+-- กำหนดตัวแปรสำหรับ Services ที่ต้องใช้
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+-- รอให้โฟลเดอร์ Servers และ RemoteFunction โหลดเสร็จก่อน
+local serversFolder = ReplicatedStorage:WaitForChild("Servers")
+local teleportFunc = ReplicatedStorage:WaitForChild("func")
+
+-- สร้างตัวแปรเพื่อเก็บข้อมูลเซิร์ฟเวอร์ที่ดีที่สุด
+local targetServerData = nil
+local minPlayers = math.huge -- ตั้งค่าเริ่มต้นให้เป็นค่าที่สูงที่สุดเท่าที่จะเป็นไปได้
+
+-- ตรวจสอบว่ามีโฟลเดอร์ Servers อยู่จริง
+if serversFolder then
+    print("กำลังค้นหาเซิร์ฟเวอร์ที่มีผู้เล่นน้อยที่สุด...")
+    
+    -- วนลูปเพื่อหาเซิร์ฟเวอร์ทั้งหมดในโฟลเดอร์
+    for _, serverInstance in ipairs(serversFolder:GetChildren()) do
+        -- เพิ่มเงื่อนไขเพื่อตรวจสอบว่าชื่อขึ้นต้นด้วย "SERVER" หรือไม่
+        if string.match(serverInstance.Name, "^SERVER") then
+            -- แก้ไขตามโครงสร้างที่ถูกต้อง:
+            -- 1. Instance ภายในโฟลเดอร์ Servers (เช่น "SERVER 10") คือ StringValue โดยตรง
+            -- 2. จำนวนผู้เล่น (Players) ถูกเก็บเป็น Attribute ของ StringValue นั้น
+            -- 3. ข้อมูลสำหรับเทเลพอร์ต (data) คือค่า .Value ของ StringValue นั้นเอง
+            
+            if serverInstance:IsA("StringValue") then
+                local currentPlayers = serverInstance:GetAttribute("Players")
+                local rawServerData = serverInstance.Value
+                
+                -- [แก้ไข] ตัดคำว่า " nil" และช่องว่างที่อาจต่อท้ายค่า Value (JobId) ออก
+                local serverData = string.gsub(rawServerData, "%s*nil$", "")
+
+                -- ตรวจสอบว่าพบ Attribute 'Players' และค่า Value ไม่ใช่ค่าว่าง
+                if currentPlayers and serverData ~= "" then
+                    print("พบเซิร์ฟเวอร์: " .. serverInstance.Name .. " | ผู้เล่น: " .. tostring(currentPlayers))
+
+                    -- เปรียบเทียบจำนวนผู้เล่นกับค่าน้อยที่สุดที่เคยเจอ
+                    if currentPlayers < minPlayers then
+                        minPlayers = currentPlayers
+                        targetServerData = serverData
+                        print("พบเซิร์ฟเวอร์ใหม่ที่มีผู้เล่นน้อยกว่า! เซิร์ฟเวอร์เป้าหมายคือ: " .. serverInstance.Name)
+                    end
+                end
+            end
+        end
+    end
+    
+    -- หลังจากวนลูปครบแล้ว ให้ตรวจสอบว่าเราเจอเซิร์ฟเวอร์เป้าหมายหรือไม่
+    if targetServerData then
+        print("กำลังเทเลพอร์ตไปยังเซิร์ฟเวอร์ที่มีผู้เล่นน้อยที่สุด (" .. tostring(minPlayers) .. " คน)...")
+        
+        -- [DEBUG] เพิ่มการ print เพื่อดูค่า JobId ที่จะส่งไป
+        print("JobId ที่จะใช้ในการเทเลพอร์ต: " .. tostring(targetServerData))
+        
+        -- เรียกใช้ RemoteFunction เพื่อทำการเทเลพอร์ต
+        -- ตามคำสั่งที่ให้มา: game:GetService("ReplicatedStorage"):WaitForChild("func"):InvokeServer("teleport", "ค่า Value หมวด data")
+        teleportFunc:InvokeServer("teleport", targetServerData)
+    else
+        warn("ไม่พบข้อมูลเซิร์ฟเวอร์ที่ถูกต้อง ไม่สามารถเทเลพอร์ตได้")
+    end
+else
+    warn("ไม่พบโฟลเดอร์ 'Servers' ใน ReplicatedStorage")
+end
+
