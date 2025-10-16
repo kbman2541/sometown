@@ -1,6 +1,6 @@
 --[[
-  สคริปต์นี้จะสุ่มเลือกเซิร์ฟเวอร์จากรายการที่มีอยู่
-  และเทเลพอร์ตผู้เล่นไปยังเซิร์ฟเวอร์นั้น
+  สคริปต์นี้จะสุ่มเลือกเซิร์ฟเวอร์ที่มีผู้เล่นน้อยกว่า 30 คน
+  และเทเลพอร์ตผู้เล่นไปยังเซิร์ฟเวอร์นั้น
 ]]
 
 -- กำหนดตัวแปรสำหรับ Services ที่ต้องใช้
@@ -11,92 +11,59 @@ local Players = game:GetService("Players")
 local serversFolder = ReplicatedStorage:WaitForChild("Servers")
 local teleportFunc = ReplicatedStorage:WaitForChild("func")
 
--- สร้างตาราง (table) เพื่อเก็บรายชื่อเซิร์ฟเวอร์ที่สามารถเข้าร่วมได้
-local availableServers = {}
+-- สร้างตาราง (table) เพื่อเก็บเซิร์ฟเวอร์ที่มีผู้เล่นน้อยกว่า 30 คน
+local eligibleServers = {}
+local maxPlayers = 30 -- กำหนดจำนวนผู้เล่นสูงสุด
 
 -- ตรวจสอบว่ามีโฟลเดอร์ Servers อยู่จริง
 if serversFolder then
-    print("กำลังรวบรวมรายชื่อเซิร์ฟเวอร์...")
-    
-    -- วนลูปเพื่อหาเซิร์ฟเวอร์ทั้งหมดในโฟลเดอร์
-    for _, serverInstance in ipairs(serversFolder:GetChildren()) do
-        -- เพิ่มเงื่อนไขเพื่อตรวจสอบว่าชื่อขึ้นต้นด้วย "SERVER" หรือไม่
-        if string.match(serverInstance.Name, "^SERVER") then
-            -- ตรวจสอบว่าเป็น StringValue และมีข้อมูลครบถ้วน
-            if serverInstance:IsA("StringValue") then
-                local currentPlayers = serverInstance:GetAttribute("Players")
-                local rawServerData = serverInstance.Value
-                
-                -- ตัดคำว่า " nil" และช่องว่างที่อาจต่อท้ายค่า Value (JobId) ออก
-                local serverData = string.gsub(rawServerData, "%s*nil$", "")
+	print("กำลังค้นหาเซิร์ฟเวอร์ที่มีผู้เล่นน้อยกว่า " .. maxPlayers .. " คน...")
 
-                -- ตรวจสอบว่าพบ Attribute 'Players' และค่า Value ไม่ใช่ค่าว่าง
-                if currentPlayers and serverData ~= "" then
-                    print("พบเซิร์ฟเวอร์ที่สามารถเข้าร่วมได้: " .. serverInstance.Name)
-                    -- เพิ่ม JobId ของเซิร์ฟเวอร์ที่ใช้ได้เข้าไปในตาราง
-                    table.insert(availableServers, serverData)
-                end
-            end
-        end
-    end
-    
-    -- หลังจากวนลูปครบแล้ว ให้ตรวจสอบว่ามีเซิร์ฟเวอร์ในรายการหรือไม่
-    if #availableServers > 0 then
-        print("พบเซิร์ฟเวอร์ทั้งหมด " .. #availableServers .. " แห่ง, กำลังสุ่มเซิร์ฟเวอร์...")
-        
-        -- สุ่มเลือกเซิร์ฟเวอร์จากรายการที่รวบรวมมา
-        local randomIndex = math.random(1, #availableServers)
-        local targetServerData = availableServers[randomIndex]
+	-- วนลูปเพื่อหาเซิร์ฟเวอร์ทั้งหมดในโฟลเดอร์
+	for _, serverInstance in ipairs(serversFolder:GetChildren()) do
+		-- เพิ่มเงื่อนไขเพื่อตรวจสอบว่าชื่อขึ้นต้นด้วย "SERVER" หรือไม่
+		if string.match(serverInstance.Name, "^SERVER") then
+			if serverInstance:IsA("StringValue") then
+				local currentPlayers = serverInstance:GetAttribute("Players")
+				local rawServerData = serverInstance.Value
 
-        print("กำลังเทเลพอร์ตไปยังเซิร์ฟเวอร์ที่สุ่มเลือก...")
-        print("JobId ที่จะใช้ในการเทเลพอร์ต: " .. tostring(targetServerData))
-        
-        -- เรียกใช้ RemoteFunction เพื่อทำการเทเลพอร์ต
-        teleportFunc:InvokeServer("teleport", targetServerData)
-    else
-        warn("ไม่พบข้อมูลเซิร์ฟเวอร์ที่ถูกต้อง ไม่สามารถเทเลพอร์ตได้")
-    end
+				-- ตัดคำว่า " nil" และช่องว่างที่อาจต่อท้ายค่า Value (JobId) ออก
+				local serverData = string.gsub(rawServerData, "%s*nil$", "")
+
+				-- ตรวจสอบว่าพบ Attribute 'Players' และค่า Value ไม่ใช่ค่าว่าง
+				if currentPlayers and serverData ~= "" then
+					print("พบเซิร์ฟเวอร์: " .. serverInstance.Name .. " | ผู้เล่น: " .. tostring(currentPlayers))
+
+					-- ตรวจสอบว่าจำนวนผู้เล่นน้อยกว่าค่าที่กำหนดหรือไม่
+					if currentPlayers < maxPlayers then
+						print("เพิ่ม " .. serverInstance.Name .. " ไปยังรายชื่อเซิร์ฟเวอร์ที่สามารถเข้าร่วมได้")
+						table.insert(eligibleServers, serverData)
+					end
+				end
+			end
+		end
+	end
+
+	-- หลังจากวนลูปครบแล้ว ให้ตรวจสอบว่าเราเจอเซิร์ฟเวอร์ที่เข้าเงื่อนไขหรือไม่
+	if #eligibleServers > 0 then
+		-- มีเซิร์ฟเวอร์ที่สามารถเข้าร่วมได้อย่างน้อยหนึ่งเซิร์ฟเวอร์
+		print("พบเซิร์ฟเวอร์ที่สามารถเข้าร่วมได้ " .. #eligibleServers .. " เซิร์ฟเวอร์ กำลังทำการสุ่ม...")
+
+		-- สุ่มเลือกเซิร์ฟเวอร์จากรายชื่อ
+		local randomIndex = math.random(1, #eligibleServers)
+		local targetServerData = eligibleServers[randomIndex]
+
+		print("กำลังเทเลพอร์ตไปยังเซิร์ฟเวอร์ที่สุ่มเลือก...")
+
+		-- [DEBUG] เพิ่มการ print เพื่อดูค่า JobId ที่จะส่งไป
+		print("JobId ที่จะใช้ในการเทเลพอร์ต: " .. tostring(targetServerData))
+
+		-- เรียกใช้ RemoteFunction เพื่อทำการเทเลพอร์ต
+		teleportFunc:InvokeServer("teleport", targetServerData)
+	else
+		warn("ไม่พบเซิร์ฟเวอร์ที่มีผู้เล่นน้อยกว่า " .. maxPlayers .. " คน ไม่สามารถเทเลพอร์ตได้")
+	end
 else
-    warn("ไม่พบโฟลเดอร์ 'Servers' ใน ReplicatedStorage")
+	warn("ไม่พบโฟลเดอร์ 'Servers' ใน ReplicatedStorage")
 end
 
--- =============================================
--- Settings
--- =============================================
-local DIAMOND_ATTRIBUTE_NAME = "Diamond" -- Attribute to display on the counter UI.
-
--- =============================================
--- Service Definitions
--- =============================================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local PathfindingService = game:GetService("PathfindingService")
-
--- =============================================
--- [MODIFIED] Make workspace.Folder cleanup more robust
--- =============================================
--- Initial check in case the folder already exists at script start
-local existingFolder = Workspace:FindFirstChild("Folder")
-if existingFolder then
-    existingFolder:Destroy()
-    print("Workspace.Folder found on startup and was deleted.")
-end
-
--- Listen for the folder being added in the future to ensure it's always deleted
-Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "Folder" then
-        task.wait() -- Allow the object to be fully parented before destroying
-        child:Destroy()
-        print("Workspace.Folder was added and has now been deleted.")
-    end
-end)
-
-
--- Ensure this script only runs on the client
-if not RunService:IsClient() then
-    return
-end
