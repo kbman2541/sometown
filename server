@@ -1,14 +1,12 @@
 -- ================== Services ==================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
 local CoreGui = game:GetService("CoreGui")
 
 -- ================== Configuration ==================
--- // กำหนดค่าต่างๆ ที่นี่ //
-local TARGET_UI_NAME = "serverlistUI" -- ชื่อของ UI ที่เราจะเฝ้าดู
-local MAX_PLAYERS = 30 -- กำหนดจำนวนผู้เล่นสูงสุดที่ยอมรับได้ในเซิร์ฟเวอร์
-local RETRY_DELAY_SECONDS = 30 -- ลดเวลาหน่วงเหลือ 30 วินาที เพื่อให้ลองใหม่เร็วขึ้น
+local TARGET_UI_NAME = "serverlistUI" -- UI ที่เฝ้าดู
+local MAX_PLAYERS = 30
+local RETRY_DELAY_SECONDS = 30
 
 -- ================== Variables ==================
 local player = Players.LocalPlayer
@@ -16,40 +14,37 @@ local playerGui = player:WaitForChild("PlayerGui")
 local teleportFunc = ReplicatedStorage:WaitForChild("func")
 local serversFolder = ReplicatedStorage:WaitForChild("Servers")
 
--- ตัวแปรสำหรับจัดการสถานะ
 local lastAttemptTime = 0
-local isTeleporting = false -- ใช้เพื่อเช็คว่ากำลังอยู่ในกระบวนการเทเลพอร์ตหรือไม่
+local isTeleporting = false
 
 -- ================== Event Handling ==================
-
--- ฟังก์ชันจะทำงานเมื่อการเทเลพอร์ตล้มเหลว
-local function onTeleportFailed(player, teleportResult, errorMessage, placeId, teleportOptions)
-    warn("การเทเลพอร์ตล้มเหลว! เหตุผล: " .. tostring(errorMessage))
+local function onTeleportFailed(player, teleportResult, errorMessage)
+    warn("Teleport Failed! Reason: " .. tostring(errorMessage))
     isTeleporting = false
-    lastAttemptTime = os.clock() -- เริ่มนับเวลาถอยหลังใหม่ทันทีที่ล้มเหลว
+    lastAttemptTime = os.clock()
 end
 
--- เชื่อมต่อฟังก์ชันเข้ากับ Event ของ TeleportService
-TeleportService.TeleportInitFailed:Connect(onTeleportFailed)
+-- หากเกมมี TeleportInitFailed
+if game:GetService("TeleportService").TeleportInitFailed then
+    game:GetService("TeleportService").TeleportInitFailed:Connect(onTeleportFailed)
+end
 
--- ================== Core Function ==================
-
--- [!!!] ฟังก์ชันสำหรับค้นหาและปิดหน้าต่าง "Teleport Failed"
--- ใช้วิธีวนลูปสแกนหา UI ทุกวินาทีเพื่อความแน่นอนสูงสุด
+-- ================== Core Functions ==================
 local function findAndCloseErrorDialog()
     local guisToSearch = {playerGui, CoreGui}
     for _, guiContainer in ipairs(guisToSearch) do
-        -- ใช้ pcall เพื่อป้องกัน error ที่อาจเกิดขึ้นหาก UI ถูกทำลายไปแล้วระหว่างการสแกน
         pcall(function()
             for _, descendant in ipairs(guiContainer:GetDescendants()) do
-                if descendant:IsA("TextLabel") and (string.find(descendant.Text, "Teleport Failed") or string.find(descendant.Text, "Error Code: 773")) then
-                    local screenGui = descendant:FindFirstAncestorOfClass("ScreenGui")
-                    -- ตรวจสอบให้แน่ใจว่าเจอ ScreenGui และมันยังไม่ถูกทำลาย
-                    if screenGui and screenGui.Parent then
-                        print("ตรวจพบและทำลายหน้าต่างข้อผิดพลาด (ผ่านการสแกน): " .. screenGui.Name)
-                        screenGui:Destroy()
-                        isTeleporting = false
-                        lastAttemptTime = os.clock()
+                if descendant:IsA("TextLabel") then
+                    local text = descendant.Text
+                    if string.find(text, "Teleport Failed") or string.find(text, "Error Code: 773") then
+                        local screenGui = descendant:FindFirstAncestorOfClass("ScreenGui")
+                        if screenGui and screenGui.Parent then
+                            print("พบหน้าต่างข้อผิดพลาดแล้วลบ: " .. screenGui.Name)
+                            screenGui:Destroy()
+                            isTeleporting = false
+                            lastAttemptTime = os.clock()
+                        end
                     end
                 end
             end
@@ -57,25 +52,20 @@ local function findAndCloseErrorDialog()
     end
 end
 
-
--- ฟังก์ชันสำหรับค้นหา, สุ่ม และยิงคำสั่งเทเลพอร์ต
 local function findAndTeleportToRandomServer()
     if not serversFolder then
-        warn("ไม่พบโฟลเดอร์ 'Servers' ใน ReplicatedStorage, ไม่สามารถค้นหาเซิร์ฟเวอร์ได้")
+        warn("ไม่พบโฟลเดอร์ 'Servers'")
         return
     end
 
     local eligibleServers = {}
-    print("กำลังค้นหาเซิร์ฟเวอร์สาธารณะที่มีผู้เล่นน้อยกว่า " .. MAX_PLAYERS .. " คน...")
 
     for _, serverInstance in ipairs(serversFolder:GetChildren()) do
         if string.match(serverInstance.Name, "^SERVER") and serverInstance:IsA("StringValue") then
             local currentPlayers = serverInstance:GetAttribute("Players")
-            local rawServerData = serverInstance.Value
             local serverType = serverInstance:GetAttribute("ServerType")
-            local serverData = string.gsub(rawServerData, "%s*nil$", "")
-
-            if currentPlayers and serverData ~= "" and (serverType ~= "Private") then
+            local serverData = string.gsub(serverInstance.Value, "%s*nil$", "")
+            if currentPlayers and serverData ~= "" and serverType ~= "Private" then
                 if currentPlayers < MAX_PLAYERS then
                     table.insert(eligibleServers, serverData)
                 end
@@ -84,43 +74,36 @@ local function findAndTeleportToRandomServer()
     end
 
     if #eligibleServers > 0 then
-        print("พบเซิร์ฟเวอร์สาธารณะที่สามารถเข้าร่วมได้ " .. #eligibleServers .. " เซิร์ฟเวอร์ กำลังทำการสุ่ม...")
         local randomIndex = math.random(1, #eligibleServers)
         local targetServerData = eligibleServers[randomIndex]
 
-        print("กำลังเทเลพอร์ตไปยังเซิร์ฟเวอร์ที่สุ่มเลือก...")
-        print("JobId ที่จะใช้: " .. tostring(targetServerData))
-        
+        print("กำลังเทเลพอร์ตไปเซิร์ฟเวอร์ JobId: " .. tostring(targetServerData))
         isTeleporting = true
         lastAttemptTime = os.clock()
         teleportFunc:InvokeServer("teleport", targetServerData)
     else
-        warn("ไม่พบเซิร์ฟเวอร์สาธารณะที่สามารถเข้าร่วมได้, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
+        warn("ไม่พบเซิร์ฟเวอร์ที่ว่าง, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
         lastAttemptTime = os.clock()
     end
 end
 
--- ================== Main Logic ==================
-print("TeleportManagerUI (Random): เริ่มทำงานและกำลังเฝ้าระวัง UI '"..TARGET_UI_NAME.."'")
+-- ================== Main Loop ==================
+print("TeleportManagerUI (Random) เริ่มทำงาน เฝ้าระวัง UI '"..TARGET_UI_NAME.."'")
 
 while true do
     task.wait(1)
-    
-    -- [!!!] เรียกใช้ฟังก์ชันปิดหน้าต่าง error ในทุกๆรอบ
     findAndCloseErrorDialog()
-    
+
     local serverlistUI = playerGui:FindFirstChild(TARGET_UI_NAME)
 
     if serverlistUI and serverlistUI.Enabled then
         if os.clock() > lastAttemptTime + RETRY_DELAY_SECONDS and not isTeleporting then
-            print("พบ UI '"..TARGET_UI_NAME.."', กำลังเริ่มกระบวนการสุ่มเซิร์ฟเวอร์...")
+            print("พบ UI '"..TARGET_UI_NAME.."', เริ่มสุ่มเซิร์ฟเวอร์")
             findAndTeleportToRandomServer()
         end
     else
         if lastAttemptTime ~= 0 and not isTeleporting then
-            print("UI '"..TARGET_UI_NAME.."' หายไปแล้ว, กลับสู่สถานะเฝ้าระวัง")
             lastAttemptTime = 0
         end
     end
 end
-
