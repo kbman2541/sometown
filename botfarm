@@ -589,7 +589,7 @@ local function moveToCoords(inputBox)
 end
 
 -- Farming coordinates
-local initialFarmPosition = Vector3.new(-339, 40, -2713)
+local initialFarmPosition = Vector3.new(-296, 12, -2489)
 local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
 
 -- Farm Step for auto-resume
