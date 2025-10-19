@@ -1,4 +1,3 @@
-
 -- =============================================
 -- Settings
 -- =============================================
@@ -72,9 +71,39 @@ local ControlPanelFrame
 local playerListFrame -- For player teleport list
 
 -- =============================================
+-- [NEW] Smooth Movement Function
+-- =============================================
+-- ฟังก์ชันนี้จะมาแทนที่การเทเลพอร์ตทั้งหมด ทำให้ตัวละครลอยไปยังจุดหมาย
+local function smoothMoveTo(destinationPosition)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        warn("smoothMoveTo failed: HumanoidRootPart not found.")
+        return
+    end
+
+    local startPosition = rootPart.Position
+    local distance = (destinationPosition - startPosition).Magnitude
+
+    if distance < 1 then return end -- ไม่ต้องเคลื่อนที่ถ้าอยู่ใกล้จุดหมายแล้ว
+
+    -- กำหนดความเร็ว (studs per second) ยิ่งค่ามาก ยิ่งเคลื่อนที่เร็ว
+    local SPEED = 1500
+    local duration = distance / SPEED
+
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local goal = { CFrame = CFrame.new(destinationPosition) }
+
+    local tween = TweenService:Create(rootPart, tweenInfo, goal)
+    tween:Play()
+    tween.Completed:Wait() -- รอให้เคลื่อนที่เสร็จก่อนทำคำสั่งถัดไป
+end
+
+
+-- =============================================
 -- Teleport to Player Logic
 -- =============================================
-local function teleportToPlayerObject(targetPlayer)
+local function moveToPlayerObject(targetPlayer)
     local localCharacter = LocalPlayer.Character
     local characterFolder = Workspace:FindFirstChild("Character")
     local targetObject = characterFolder and characterFolder:FindFirstChild(targetPlayer.Name)
@@ -91,15 +120,16 @@ local function teleportToPlayerObject(targetPlayer)
         end
 
         local success, err = pcall(function()
-            print("Teleporting to " .. targetPlayer.Name .. "'s object...")
-            localCharacter.HumanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
+            print("Moving to " .. targetPlayer.Name .. "'s object...")
+            -- [MODIFIED] ใช้ระบบลอยแทนการวาป
+            smoothMoveTo(targetPosition + Vector3.new(0, 5, 0))
         end)
-        if not success then warn("Teleport failed: ", err) end
+        if not success then warn("Movement failed: ", err) end
     else
         if not targetObject then
-            print("Teleport failed: Cannot find object for player '" .. targetPlayer.Name .. "'")
+            print("Movement failed: Cannot find object for player '" .. targetPlayer.Name .. "'")
         else
-            print("Teleport failed: Local player's character not found.")
+            print("Movement failed: Local player's character not found.")
         end
     end
 end
@@ -130,7 +160,7 @@ local function updatePlayerList()
                     playerButton.TextSize = 16
                     playerButton.Parent = playerListFrame
                     playerButton.MouseButton1Click:Connect(function()
-                        teleportToPlayerObject(player)
+                        moveToPlayerObject(player)
                     end)
                 end
                 existingButtons[player.Name] = nil
@@ -219,16 +249,13 @@ end
 local function createControlPanelUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
 
-    -- [NEW] Add UIAspectRatioConstraint to make the UI responsive
-    local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
-    AspectRatioConstraint.AspectRatio = 250 / 360 -- Updated for new button
-    AspectRatioConstraint.DominantAxis = Enum.DominantAxis.Height
-    AspectRatioConstraint.Parent = ScreenGui
-
+    -- [MODIFIED] Increased height for the new button
+    local frameHeight = 400
+    
     -- Main Draggable Frame
-    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame"; 
-    ControlPanelFrame.Size = UDim2.new(0, 250, 0, 360) -- Increased height for new button
-    ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0); 
+    ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame";
+    ControlPanelFrame.Size = UDim2.new(0, 250, 0, frameHeight)
+    ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0);
     ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
     ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
     local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
@@ -254,18 +281,20 @@ local function createControlPanelUI()
     local UICorner_CoordLabel = Instance.new("UICorner", CoordinateLabel); UICorner_CoordLabel.CornerRadius = UDim.new(0, 6)
     local InputBox = Instance.new("TextBox"); InputBox.Parent = ControlsContentFrame; InputBox.Name = "InputBox"; InputBox.Size = UDim2.new(1, -70, 0, 30); InputBox.Position = UDim2.new(0, 10, 0, 40); InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 65); InputBox.Font = Enum.Font.SourceSans; InputBox.Text = "X, Y, Z"; InputBox.TextColor3 = Color3.fromRGB(200, 200, 200); InputBox.TextSize = 16; InputBox.ClearTextOnFocus = true
     local UICorner_InputBox = Instance.new("UICorner", InputBox); UICorner_InputBox.CornerRadius = UDim.new(0, 6)
-    local TeleportButton = Instance.new("TextButton"); TeleportButton.Parent = ControlsContentFrame; TeleportButton.Name = "TeleportButton"; TeleportButton.Size = UDim2.new(0, 50, 0, 30); TeleportButton.Position = UDim2.new(1, -60, 0, 40); TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); TeleportButton.Font = Enum.Font.SourceSansBold; TeleportButton.Text = "Go"; TeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportButton.TextSize = 16
-    local UICorner_TeleportBtn = Instance.new("UICorner", TeleportButton); UICorner_TeleportBtn.CornerRadius = UDim.new(0, 6)
+    local GoButton = Instance.new("TextButton"); GoButton.Parent = ControlsContentFrame; GoButton.Name = "GoButton"; GoButton.Size = UDim2.new(0, 50, 0, 30); GoButton.Position = UDim2.new(1, -60, 0, 40); GoButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); GoButton.Font = Enum.Font.SourceSansBold; GoButton.Text = "Go"; GoButton.TextColor3 = Color3.fromRGB(255, 255, 255); GoButton.TextSize = 16
+    local UICorner_GoBtn = Instance.new("UICorner", GoButton); UICorner_GoBtn.CornerRadius = UDim.new(0, 6)
     local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "ฟามแร่"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
     local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local TeleportToSellButton = Instance.new("TextButton"); TeleportToSellButton.Name = "TeleportToSellButton"; TeleportToSellButton.Size = UDim2.new(1, -20, 0, 30); TeleportToSellButton.Position = UDim2.new(0, 10, 0, 160); TeleportToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); TeleportToSellButton.Font = Enum.Font.SourceSansBold; TeleportToSellButton.Text = "จุดขาย"; TeleportToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); TeleportToSellButton.TextSize = 16; TeleportToSellButton.Parent = ControlsContentFrame
-    local UICorner_TeleportSellBtn = Instance.new("UICorner", TeleportToSellButton); UICorner_TeleportSellBtn.CornerRadius = UDim.new(0, 6)
-
-    -- [NEW] Sell Loop Button
+    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "จุดขาย"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
+    local UICorner_MoveSellBtn = Instance.new("UICorner", MoveToSellButton); UICorner_MoveSellBtn.CornerRadius = UDim.new(0, 6)
     local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "วนขายของ"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
     local UICorner_SellLoopBtn = Instance.new("UICorner", SellLoopButton); UICorner_SellLoopBtn.CornerRadius = UDim.new(0, 6)
+
+    -- [NEW] Blue Label Button
+    local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "เลเบลฟ้า"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
+    local UICorner_BlueLabelBtn = Instance.new("UICorner", BlueLabelButton); UICorner_BlueLabelBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
@@ -279,16 +308,18 @@ local function createControlPanelUI()
         CollapseButton = CollapseButton,
         CoordinateLabel = CoordinateLabel,
         InputBox = InputBox,
-        TeleportButton = TeleportButton,
+        GoButton = GoButton,
         FarmOreButton = FarmOreButton,
         BuyFoodButton = BuyFoodButton,
-        TeleportToSellButton = TeleportToSellButton,
-        SellLoopButton = SellLoopButton, -- Added new button here
+        MoveToSellButton = MoveToSellButton,
+        SellLoopButton = SellLoopButton,
+        BlueLabelButton = BlueLabelButton, -- Added new button here
         WarpToKealohaButton = WarpToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
         ControlsContentFrame = ControlsContentFrame,
-        PlayersContentFrame = PlayersContentFrame
+        PlayersContentFrame = PlayersContentFrame,
+        ControlPanelFrame = ControlPanelFrame -- Return the main frame for resizing
     }
 end
 
@@ -297,7 +328,7 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 360) -- Updated size
+local originalSize = UDim2.new(0, 250, 0, 400) -- Updated size
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local inventoryConnection = nil
@@ -432,20 +463,13 @@ local function findAndWalkToClosestOre(oreToExclude)
     end
 end
 
--- Teleport to Coords
-local function teleportPlayer(inputBox)
-    local currentCharacter = LocalPlayer.Character
-    local currentRootPart = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart then
-        inputBox.Text = "Error: Character not found"
-        return
-    end
-
+-- [MODIFIED] Move to Coords using smooth movement
+local function moveToCoords(inputBox)
     local parts = inputBox.Text:split(",")
     if #parts == 3 then
         local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
         if x and y and z then
-            currentRootPart.CFrame = CFrame.new(x, y, z)
+            smoothMoveTo(Vector3.new(x, y, z))
             inputBox.Text = ""
         else
             inputBox.Text = "Error: Invalid Format"
@@ -456,14 +480,13 @@ local function teleportPlayer(inputBox)
 end
 
 -- Farming coordinates
-local initialFarmPosition = CFrame.new(-339, 40, -2713)
-local postProcessFarmPosition = CFrame.new(-332, 35, -2680)
+local initialFarmPosition = Vector3.new(-339, 40, -2713)
+local postProcessFarmPosition = Vector3.new(-332, 35, -2680)
 
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
-    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart or not isOreFarmLoopActive then return end
-    currentRootPart.CFrame = postProcessFarmPosition
+    if not isOreFarmLoopActive then return end
+    smoothMoveTo(postProcessFarmPosition) -- [MODIFIED]
     task.wait(0.1)
     findAndWalkToClosestOre(nil)
 end
@@ -481,26 +504,19 @@ local function onInventoryChanged(attributeName, farmButton)
         farmButton.Text = "Waiting for Rock..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         
-        print("Rock count reached 100. Cooldown for 2 seconds before warp.")
+        print("Rock count reached 100. Cooldown for 2 seconds before moving.")
         task.wait(2)
         
-        print("Preparing to warp and process.")
+        print("Preparing to move and process.")
         
-        local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        print("Moving to process point at:", postProcessFarmPosition)
+        smoothMoveTo(postProcessFarmPosition) -- [MODIFIED]
         
-        if currentRootPart then
-            print("Warping to process point at:", postProcessFarmPosition.Position)
-            
-            currentRootPart.CFrame = postProcessFarmPosition
-            
-            print("Teleport command issued. Waiting 4 seconds...")
-            task.wait(4)
-            
-            print("Wait finished. Sending 'Process' command to server...")
-            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-        else
-            warn("Could not find HumanoidRootPart to warp. Cannot process.")
-        end
+        print("Move command issued. Waiting 4 seconds...")
+        task.wait(4)
+        
+        print("Wait finished. Sending 'Process' command to server...")
+        NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         
     elseif isWaitingForRockToClear and rockCount == 0 then
         print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
@@ -535,8 +551,8 @@ local function toggleOreFarmLoop(farmButton)
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if currentRootPart then
             lastPosition = currentRootPart.Position
-            print("Starting farm manually. Teleporting to initial position...")
-            currentRootPart.CFrame = initialFarmPosition
+            print("Starting farm manually. Moving to initial position...")
+            smoothMoveTo(initialFarmPosition) -- [MODIFIED]
             task.wait(0.1)
             findAndWalkToClosestOre(nil)
         end
@@ -606,26 +622,17 @@ end
 -- Buy/Sell/Walk Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
-    local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not currentRootPart then return end
-    currentRootPart.CFrame = CFrame.new(3000, 16, 2280)
+    smoothMoveTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
     task.wait(0.2)
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
     task.wait(0.2)
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
-local function teleportToSellPoint()
-    local character = LocalPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then
-        print("Teleport to sell point failed: HumanoidRootPart not found.")
-        return
-    end
-
+local function moveToSellPoint()
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
-    print("Teleporting to sell point...")
-    rootPart.CFrame = CFrame.new(destination + Vector3.new(0, 3, 0))
+    print("Moving to sell point...")
+    smoothMoveTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
 end
 
 local function warpToKealoha()
@@ -633,8 +640,8 @@ local function warpToKealoha()
     local targetPlayer = Players:FindFirstChild(targetPlayerName)
     
     if targetPlayer then
-        print("Found player " .. targetPlayerName .. ". Attempting to teleport.")
-        teleportToPlayerObject(targetPlayer)
+        print("Found player " .. targetPlayerName .. ". Attempting to move.")
+        moveToPlayerObject(targetPlayer)
     else
         warn("Player " .. targetPlayerName .. " not found in the game.")
     end
@@ -653,13 +660,8 @@ local function handleDeathAndRecover()
         
         task.wait(3)
 
-        print("Teleporting to recovery point (0, -200, 0)...")
-        local rootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            rootPart.CFrame = CFrame.new(0, -200, 0)
-        else
-            warn("Could not find HumanoidRootPart for recovery teleport.")
-        end
+        print("Moving to recovery point (0, -200, 0)...")
+        smoothMoveTo(Vector3.new(0, -200, 0)) -- [MODIFIED]
 
         task.wait(3)
 
@@ -690,6 +692,7 @@ diamondCountLabel = createDiamondCounterUI()
 
 -- Setup Logic
 setupDiamondCounter(diamondCountLabel)
+originalSize = UIElements.ControlPanelFrame.Size -- Update original size from created UI
 
 -- Connect Death Handler
 local humanoid = Character:WaitForChild("Humanoid")
@@ -770,21 +773,28 @@ end
 
 UIElements.CollapseButton.MouseButton1Click:Connect(toggleCollapse)
 UIElements.ControlsTabButton.MouseButton1Click:Connect(function() switchTab("Controls") end)
-UIElements.PlayersTabButton.MouseButton1Click:Connect(function() switchTab("Players") end)
-UIElements.TeleportButton.MouseButton1Click:Connect(function() teleportPlayer(UIElements.InputBox) end)
+UIElements.PlayersTabButton.MouseButton1Click:Connect(function() 
+    switchTab("Players")
+    updatePlayerList() -- Update player list when tab is clicked
+end)
+UIElements.GoButton.MouseButton1Click:Connect(function() moveToCoords(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
-UIElements.TeleportToSellButton.MouseButton1Click:Connect(teleportToSellPoint)
+UIElements.MoveToSellButton.MouseButton1Click:Connect(moveToSellPoint)
 UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
--- [NEW] Connect the sell loop button
 UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UIElements.SellLoopButton) end)
+-- [NEW] Connect the blue label button
+UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
+    print("Moving to Blue Label location...")
+    smoothMoveTo(Vector3.new(1936, 15, 2285))
+end)
 
 
--- Keybind to toggle the main control panel
+-- [MODIFIED] Keybind to toggle the main control panel changed to 'T'
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent then return end
 
-    if input.KeyCode == Enum.KeyCode.F then
+    if input.KeyCode == Enum.KeyCode.T then
         UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
     end
 end)
