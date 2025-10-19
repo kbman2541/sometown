@@ -979,6 +979,73 @@ task.spawn(function()
     end
 end)
 
+-- ====================================================================================
+-- [[ NEW ]] Health-Based Recovery Loop
+-- This loop listens for the 'MaxHealth' attribute in the Player's Status folder.
+-- If MaxHealth drops to 0, it triggers a special recovery sequence.
+-- ====================================================================================
+task.spawn(function()
+    local statusFolder = LocalPlayer:WaitForChild("Status")
+    if not statusFolder then
+        warn("Health-based recovery: Status folder not found.")
+        return
+    end
+
+    statusFolder.AttributeChanged:Connect(function(attributeName)
+        if attributeName == "MaxHealth" then
+            local maxHealthValue = statusFolder:GetAttribute("MaxHealth")
+            if maxHealthValue and maxHealthValue == 0 then
+                
+                -- Spawn a new coroutine to handle the sequence without blocking the event handler
+                task.spawn(function()
+                    print("MaxHealth reached 0. Initiating special recovery procedure.")
+
+                    -- 1. Stop farming
+                    if isOreFarmLoopActive then
+                        print("Halting ore farming...")
+                        toggleOreFarmLoop(UIElements.FarmOreButton)
+                        task.wait(0.5) -- Small delay to ensure state change
+                    end
+
+                    -- 2. Go to sell point
+                    print("Moving to sell point (Attempt 1)...")
+                    moveToSellPoint()
+
+                    -- 3. Wait 30 seconds
+                    print("Waiting for 30 seconds...")
+                    task.wait(30)
+
+                    -- 4. Go to sell point again
+                    print("Moving to sell point (Attempt 2)...")
+                    moveToSellPoint()
+
+                    -- 5. Wait 2 seconds
+                    print("Waiting for 2 seconds...")
+                    task.wait(2)
+
+                    -- 6. Warp to recovery coordinates
+                    local recoveryCoords = Vector3.new(50, -200, 50)
+                    print("Warping to recovery location: " .. tostring(recoveryCoords))
+                    smoothMoveTo(recoveryCoords)
+
+                    -- 7. Wait 5 seconds
+                    print("Waiting for 5 seconds before resuming...")
+                    task.wait(5)
+
+                    -- 8. Restart farming
+                    if not isOreFarmLoopActive then
+                        print("Restarting ore farming...")
+                        toggleOreFarmLoop(UIElements.FarmOreButton)
+                    end
+                    print("Special recovery procedure complete.")
+                end)
+            end
+        end
+    end)
+    print("Health-based recovery system is active.")
+end)
+
+
 -- Re-establish character parts on respawn and connect death handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
@@ -1008,4 +1075,3 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
-
