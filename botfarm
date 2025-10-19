@@ -347,8 +347,8 @@ local function createControlPanelUI()
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
-    local WarpToKealohaButton = Instance.new("TextButton"); WarpToKealohaButton.Name = "WarpToKealohaButton"; WarpToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WarpToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WarpToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WarpToKealohaButton.Font = Enum.Font.SourceSansBold; WarpToKealohaButton.Text = "วาปหา KealohaWeaver5712"; WarpToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WarpToKealohaButton.TextSize = 16; WarpToKealohaButton.Parent = PlayersContentFrame
-    local UICorner_WarpKealohaBtn = Instance.new("UICorner", WarpToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
+    local WalkToKealohaButton = Instance.new("TextButton"); WalkToKealohaButton.Name = "WalkToKealohaButton"; WalkToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WalkToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WalkToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WalkToKealohaButton.Font = Enum.Font.SourceSansBold; WalkToKealohaButton.Text = "เดินหา KealohaWeaver5712"; WalkToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToKealohaButton.TextSize = 16; WalkToKealohaButton.Parent = PlayersContentFrame
+    local UICorner_WarpKealohaBtn = Instance.new("UICorner", WalkToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
     playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
     local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
@@ -363,7 +363,7 @@ local function createControlPanelUI()
         MoveToSellButton = MoveToSellButton,
         SellLoopButton = SellLoopButton,
         BlueLabelButton = BlueLabelButton, -- Added new button here
-        WarpToKealohaButton = WarpToKealohaButton,
+        WalkToKealohaButton = WalkToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
         ControlsContentFrame = ControlsContentFrame,
@@ -438,7 +438,67 @@ local function getObjectsToTrack()
     return trackList
 end
 
--- Pathfinding walk function
+-- ===================================================================
+-- [NEW] Pathfinding function to walk to a specific coordinate
+-- This function calculates a path and moves the character along it.
+-- ===================================================================
+local function walkToPosition(destinationPosition)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+    if not (humanoid and rootPart and humanoid.Health > 0) then return end
+
+    print("Walking to position:", destinationPosition, ". Calculating path...")
+
+    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+    local path = PathfindingService:CreatePath(agentParameters)
+
+    local success, errorMessage = pcall(function()
+        path:ComputeAsync(rootPart.Position, destinationPosition)
+    end)
+
+    if success and path.Status == Enum.PathStatus.Success then
+        print("Path calculated. Following waypoints...")
+        local waypoints = path:GetWaypoints()
+
+        local pathBlockedConnection
+        local function onPathBlocked(blockedWaypointIndex)
+             if blockedWaypointIndex < #waypoints and isWaitingForRockToClear then
+                 print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
+                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                 walkToPosition(destinationPosition) -- Recalculate and retry
+             end
+        end
+        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+
+        for _, waypoint in ipairs(waypoints) do
+            -- Check if the process was cancelled (e.g., player manually stopped farming)
+            if not isWaitingForRockToClear then
+                print("Process was cancelled mid-path. Aborting walk.")
+                break
+            end
+            humanoid:MoveTo(waypoint.Position)
+
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+
+            humanoid.MoveToFinished:Wait()
+        end
+
+        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+        print("Reached destination or path ended.")
+    else
+        warn("Pathfinding to position failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
+        humanoid:MoveTo(destinationPosition)
+        humanoid.MoveToFinished:Wait() -- Also wait for direct move
+    end
+end
+
+
+-- Pathfinding walk function to ore
 local function findAndWalkToClosestOre(oreToExclude)
     local character = LocalPlayer.Character
     if not character then return end
@@ -535,9 +595,9 @@ local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
     if not isOreFarmLoopActive then return end
-    smoothMoveTo(postProcessFarmPosition) -- [MODIFIED]
+    smoothMoveTo(postProcessFarmPosition) -- Use fast travel to get back to the general area
     task.wait(0.1)
-    findAndWalkToClosestOre(nil)
+    findAndWalkToClosestOre(nil) -- Then start walking to the nearest ore
 end
 
 -- Inventory change handler for farming
@@ -546,27 +606,29 @@ local function onInventoryChanged(attributeName, farmButton)
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
+    -- [MODIFIED BLOCK] This is the main change. It now calls walkToPosition instead of smoothMoveTo.
     if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
         isWaitingForRockToClear = true
         isOreFarmLoopActive = false -- Pause farming
 
-        farmButton.Text = "Waiting for Rock..."
+        farmButton.Text = "Walking to Process..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         
-        print("Rock count reached 100. Cooldown for 2 seconds before moving.")
-        task.wait(2)
+        print("Rock count reached 100. Waiting 1 second before walking.")
+        task.wait(1)
         
-        print("Preparing to move and process.")
+        print("Walking to process point at:", postProcessFarmPosition)
+        walkToPosition(postProcessFarmPosition) -- <<<< KEY CHANGE HERE: Use walk function
         
-        print("Moving to process point at:", postProcessFarmPosition)
-        smoothMoveTo(postProcessFarmPosition) -- [MODIFIED]
-        
-        print("Move command issued. Waiting 4 seconds...")
-        task.wait(4)
-        
-        print("Wait finished. Sending 'Process' command to server...")
-        NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-        
+        -- This code runs only after the walk is complete.
+        -- We check if the process was cancelled by the user during the walk.
+        if isWaitingForRockToClear then
+            print("Walk finished. Sending 'Process' command to server...")
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+        else
+            print("Walk was cancelled. Not sending 'Process' command.")
+        end
+
     elseif isWaitingForRockToClear and rockCount == 0 then
         print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
         task.wait(5)
@@ -684,15 +746,33 @@ local function moveToSellPoint()
     smoothMoveTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
 end
 
-local function warpToKealoha()
+local function walkToKealoha()
     local targetPlayerName = "KealohaWeaver5712"
     local targetPlayer = Players:FindFirstChild(targetPlayerName)
     
-    if targetPlayer then
-        print("Found player " .. targetPlayerName .. ". Attempting to move.")
-        moveToPlayerObject(targetPlayer)
-    else
+    if not targetPlayer then
         warn("Player " .. targetPlayerName .. " not found in the game.")
+        return
+    end
+
+    local characterFolder = Workspace:FindFirstChild("Character")
+    local targetObject = characterFolder and characterFolder:FindFirstChild(targetPlayer.Name)
+
+    if targetObject then
+        local targetPosition
+        if targetObject:IsA("Model") and targetObject.PrimaryPart then
+            targetPosition = targetObject.PrimaryPart.Position
+        elseif targetObject:IsA("BasePart") then
+            targetPosition = targetObject.Position
+        else
+            warn("Could not determine position for target object: '" .. targetObject.Name .. "'")
+            return
+        end
+        
+        print("Walking to player: " .. targetPlayer.Name)
+        walkToPosition(targetPosition)
+    else
+        warn("Could not find character object for player: " .. targetPlayer.Name)
     end
 end
 
@@ -830,7 +910,7 @@ UIElements.GoButton.MouseButton1Click:Connect(function() moveToCoords(UIElements
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
 UIElements.MoveToSellButton.MouseButton1Click:Connect(moveToSellPoint)
-UIElements.WarpToKealohaButton.MouseButton1Click:Connect(warpToKealoha)
+UIElements.WalkToKealohaButton.MouseButton1Click:Connect(walkToKealoha)
 UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UIElements.SellLoopButton) end)
 -- [NEW] Connect the blue label button
 UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
