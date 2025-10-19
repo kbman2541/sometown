@@ -15,6 +15,36 @@ local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 
 -- =============================================
+-- [NEW] Anti-Cheat Bypass
+-- This section attempts to prevent other scripts from teleporting or kicking the player,
+-- which can happen if an anti-cheat script detects the fast movement from this script.
+-- It works by intercepting calls to TeleportService and blocking them.
+-- =============================================
+pcall(function()
+    local TeleportService = game:GetService("TeleportService")
+    local mt = getrawmetatable(TeleportService)
+    local oldIndex = mt.__index
+
+    -- We replace the __index metamethod. This function is called whenever a script tries
+    -- to access a method of TeleportService (like "Teleport" or "TeleportAsync").
+    setmetatable(TeleportService, {
+        __index = function(self, key)
+            -- Check if the key being accessed is one of the teleport functions.
+            if key == "Teleport" or key == "TeleportAsync" or key == "TeleportToPrivateServer" or key == "TeleportToPlaceInstance" then
+                -- If it is, we return a new, empty function instead of the real one.
+                -- This effectively blocks the teleport call from ever happening.
+                return function(...)
+                    warn("A script attempted to teleport the player (Reason: " .. tostring(key) .. "). Call was blocked by UpdatedMovementScript.lua to prevent a kick.")
+                end
+            end
+            -- If it's any other property or method, we let it proceed as normal using the original __index.
+            return oldIndex(self, key)
+        end
+    })
+    print("Anti-teleport bypass initialized successfully.")
+end)
+
+-- =============================================
 -- [MODIFIED] Make workspace.Folder cleanup more robust
 -- =============================================
 -- Initial check in case the folder already exists at script start
@@ -71,9 +101,9 @@ local ControlPanelFrame
 local playerListFrame -- For player teleport list
 
 -- =============================================
--- [NEW] Smooth Movement Function
+-- [MODIFIED] Smooth Movement Function with Dive & Rise
 -- =============================================
--- ฟังก์ชันนี้จะมาแทนที่การเทเลพอร์ตทั้งหมด ทำให้ตัวละครลอยไปยังจุดหมาย
+-- ฟังก์ชันนี้จะเคลื่อนที่โดยการลดระดับลงก่อน, พุ่งไปยังเป้าหมาย, แล้วค่อยขึ้นไปยังตำแหน่งสุดท้าย
 local function smoothMoveTo(destinationPosition)
     local character = LocalPlayer.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
@@ -82,21 +112,40 @@ local function smoothMoveTo(destinationPosition)
         return
     end
 
-    local startPosition = rootPart.Position
-    local distance = (destinationPosition - startPosition).Magnitude
+    local startCFrame = rootPart.CFrame
+    local distance = (destinationPosition - startCFrame.Position).Magnitude
 
     if distance < 1 then return end -- ไม่ต้องเคลื่อนที่ถ้าอยู่ใกล้จุดหมายแล้ว
 
-    -- กำหนดความเร็ว (studs per second) ยิ่งค่ามาก ยิ่งเคลื่อนที่เร็ว
-    local SPEED = 1500
-    local duration = distance / SPEED
+    -- === Step 1: ดำลง (Dive Down) ===
+    local divePosition = startCFrame.Position - Vector3.new(0, 20, 0)
+    local diveTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local diveGoal = { CFrame = CFrame.new(divePosition) }
+    local diveTween = TweenService:Create(rootPart, diveTweenInfo, diveGoal)
+    diveTween:Play()
+    diveTween.Completed:Wait()
 
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local goal = { CFrame = CFrame.new(destinationPosition) }
+    -- === Step 2: พุ่งไปยังเป้าหมาย (Dash to Target) ===
+    -- ใช้ X, Z ของเป้าหมาย แต่ใช้ Y ที่ลดลงแล้ว
+    local dashDestinationPosition = Vector3.new(destinationPosition.X, divePosition.Y, destinationPosition.Z)
+    
+    -- คำนวณระยะทางและความเร็วสำหรับการพุ่ง
+    local dashDistance = (dashDestinationPosition - divePosition).Magnitude
+    local SPEED = 500 -- สามารถปรับความเร็วได้ตามต้องการ
+    local dashDuration = math.max(0.1, dashDistance / SPEED) -- ป้องกัน duration เป็น 0
+    
+    local dashTweenInfo = TweenInfo.new(dashDuration, Enum.EasingStyle.Linear)
+    local dashGoal = { CFrame = CFrame.new(dashDestinationPosition) }
+    local dashTween = TweenService:Create(rootPart, dashTweenInfo, dashGoal)
+    dashTween:Play()
+    dashTween.Completed:Wait()
 
-    local tween = TweenService:Create(rootPart, tweenInfo, goal)
-    tween:Play()
-    tween.Completed:Wait() -- รอให้เคลื่อนที่เสร็จก่อนทำคำสั่งถัดไป
+    -- === Step 3: เคลื่อนที่ขึ้นแบบลิฟต์ (Elevator Up) ===
+    local elevatorTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local elevatorGoal = { CFrame = CFrame.new(destinationPosition) }
+    local elevatorTween = TweenService:Create(rootPart, elevatorTweenInfo, elevatorGoal)
+    elevatorTween:Play()
+    elevatorTween.Completed:Wait() -- รอให้เคลื่อนที่เสร็จก่อนทำคำสั่งถัดไป
 end
 
 
@@ -879,3 +928,4 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
