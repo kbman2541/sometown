@@ -530,7 +530,7 @@ end
 
 -- Farming coordinates
 local initialFarmPosition = Vector3.new(-339, 40, -2713)
-local postProcessFarmPosition = Vector3.new(-332, 35, -2680)
+local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
 
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
