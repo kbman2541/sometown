@@ -101,7 +101,7 @@ local ControlPanelFrame
 local playerListFrame 
 
 -- =============================================
--- [NEW] 3-Stage Fly Movement Function
+-- [UPGRADED] 3-Stage Noclip Fly Movement Function
 -- =============================================
 local function flyMoveTo(destinationPosition)
     task.spawn(function()
@@ -110,6 +110,13 @@ local function flyMoveTo(destinationPosition)
         if not rootPart then
             warn("flyMoveTo failed: HumanoidRootPart not found.")
             return
+        end
+
+        -- Noclip On: Disable collisions for all parts of the character
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
         end
 
         -- Clean up any existing flight physics objects
@@ -121,7 +128,7 @@ local function flyMoveTo(destinationPosition)
 
         -- Stage 1: Dive
         local startPosition = rootPart.Position
-        local divePosition = startPosition - Vector3.new(0, 30, 0)
+        local divePosition = startPosition - Vector3.new(0, 30, 0) -- Increased dive depth
         local diveTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local diveTween = TweenService:Create(rootPart, diveTweenInfo, {CFrame = CFrame.new(divePosition)})
         diveTween:Play()
@@ -161,6 +168,14 @@ local function flyMoveTo(destinationPosition)
         local riseTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         local riseTween = TweenService:Create(rootPart, riseTweenInfo, {CFrame = CFrame.new(destinationPosition)})
         riseTween:Play()
+        riseTween.Completed:Wait() -- Wait for the rise to finish
+
+        -- Noclip Off: Re-enable collisions
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
     end)
 end
 
@@ -1000,7 +1015,7 @@ end)
 -- If MaxHealth drops to 0, it triggers a special recovery sequence.
 -- ====================================================================================
 task.spawn(function()
-    local statusFolder = LocalPlayer:WaitForChild("Status")
+    local statusFolder = LocalPlayer:FindFirstChild("Status")
     if not statusFolder then
         warn("Health-based recovery: Status folder not found.")
         return
