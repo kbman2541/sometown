@@ -1007,17 +1007,17 @@ task.spawn(function()
                         task.wait(0.5) -- Small delay to ensure state change
                     end
 
-                    -- 2. Go to sell point
-                    print("Moving to sell point (Attempt 1)...")
-                    moveToSellPoint()
+                    -- 2. Go to buy food
+                    print("Moving to buy food (Attempt 1)...")
+                    buyFood()
 
                     -- 3. Wait 30 seconds
                     print("Waiting for 30 seconds...")
                     task.wait(30)
 
-                    -- 4. Go to sell point again
-                    print("Moving to sell point (Attempt 2)...")
-                    moveToSellPoint()
+                    -- 4. Go to buy food again
+                    print("Moving to buy food (Attempt 2)...")
+                    buyFood()
 
                     -- 5. Wait 2 seconds
                     print("Waiting for 2 seconds...")
@@ -1075,3 +1075,4 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
