@@ -101,81 +101,21 @@ local ControlPanelFrame
 local playerListFrame 
 
 -- =============================================
--- [UPGRADED] 3-Stage Noclip Fly Movement Function
+-- [เปลี่ยน] ฟังก์ชันเคลื่อนที่ด้วยการเทเลพอร์ต
+-- ฟังก์ชันนี้ถูกเปลี่ยนจากการบินมาเป็นการเทเลพอร์ตทันที
 -- =============================================
-local function flyMoveTo(destinationPosition)
+local function teleportTo(destinationPosition)
     task.spawn(function()
         local character = LocalPlayer.Character
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         if not rootPart then
-            warn("flyMoveTo failed: HumanoidRootPart not found.")
+            warn("teleportTo failed: Character or HumanoidRootPart not found.")
             return
         end
 
-        -- Noclip On: Disable collisions for all parts of the character
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-
-        -- Clean up any existing flight physics objects
-        for _, v in ipairs(rootPart:GetChildren()) do
-            if v:IsA("BodyMover") then
-                v:Destroy()
-            end
-        end
-
-        -- Stage 1: Dive
-        local startPosition = rootPart.Position
-        local divePosition = startPosition - Vector3.new(0, 30, 0) -- Increased dive depth
-        local diveTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        local diveTween = TweenService:Create(rootPart, diveTweenInfo, {CFrame = CFrame.new(divePosition)})
-        diveTween:Play()
-        diveTween.Completed:Wait()
-
-        -- Stage 2: Fly Underground
-        local undergroundDestination = Vector3.new(destinationPosition.X, divePosition.Y, destinationPosition.Z)
-        
-        local gyro = Instance.new("BodyGyro")
-        gyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        gyro.CFrame = rootPart.CFrame
-        gyro.Parent = rootPart
-
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bv.Parent = rootPart
-        
-        local FLY_SPEED = 500 -- Increased speed
-        local flightCompleted = Instance.new("BindableEvent")
-        local connection 
-
-        connection = RunService.Heartbeat:Connect(function()
-            if not character or not rootPart.Parent or (rootPart.Position - undergroundDestination).Magnitude < 15 then
-                gyro:Destroy()
-                bv:Destroy()
-                if connection then connection:Disconnect() end
-                flightCompleted:Fire()
-            else
-                local direction = (undergroundDestination - rootPart.Position).Unit
-                bv.Velocity = direction * FLY_SPEED
-            end
-        end)
-        
-        flightCompleted.Event:Wait()
-
-        -- Stage 3: Rise to Destination
-        local riseTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local riseTween = TweenService:Create(rootPart, riseTweenInfo, {CFrame = CFrame.new(destinationPosition)})
-        riseTween:Play()
-        riseTween.Completed:Wait() -- Wait for the rise to finish
-
-        -- Noclip Off: Re-enable collisions
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
+        -- ย้ายตัวละครทันทีโดยการตั้งค่า CFrame
+        rootPart.CFrame = CFrame.new(destinationPosition)
+        print("Teleported to " .. tostring(destinationPosition))
     end)
 end
 
@@ -200,8 +140,8 @@ local function moveToPlayerObject(targetPlayer)
         end
 
         local success, err = pcall(function()
-            print("Flying to " .. targetPlayer.Name .. "'s object...")
-            flyMoveTo(targetPosition + Vector3.new(0, 5, 0))
+            print("Teleporting to " .. targetPlayer.Name .. "'s object...")
+            teleportTo(targetPosition + Vector3.new(0, 5, 0))
         end)
         if not success then warn("Movement failed: ", err) end
     else
@@ -496,9 +436,9 @@ local function walkToPosition(destinationPosition)
         local pathBlockedConnection
         local function onPathBlocked(blockedWaypointIndex)
              if blockedWaypointIndex < #waypoints and isWaitingForRockToClear then
-                 print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
-                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                 walkToPosition(destinationPosition) -- Recalculate and retry
+                print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
+                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                walkToPosition(destinationPosition) -- Recalculate and retry
              end
         end
         pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
@@ -602,13 +542,13 @@ local function findAndWalkToClosestOre(oreToExclude)
     end
 end
 
--- [MODIFIED] Move to Coords using smooth movement
+-- [MODIFIED] Move to Coords using teleport movement
 local function moveToCoords(inputBox)
     local parts = inputBox.Text:split(",")
     if #parts == 3 then
         local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
         if x and y and z then
-            flyMoveTo(Vector3.new(x, y, z))
+            teleportTo(Vector3.new(x, y, z))
             inputBox.Text = ""
         else
             inputBox.Text = "Error: Invalid Format"
@@ -625,8 +565,8 @@ local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
     if not isOreFarmLoopActive then return end
-    flyMoveTo(postProcessFarmPosition) -- Use fly to get back to the general area
-    task.wait(1) -- Wait for fly to finish
+    teleportTo(postProcessFarmPosition) -- Use teleport to get back to the general area
+    task.wait(1) -- Wait for teleport to settle
     findAndWalkToClosestOre(nil) -- Then start walking to the nearest ore
 end
 
@@ -636,7 +576,6 @@ local function onInventoryChanged(attributeName, farmButton)
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-    -- [MODIFIED BLOCK] This is the main change. It now calls walkToPosition instead of smoothMoveTo.
     if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
         isWaitingForRockToClear = true
         isOreFarmLoopActive = false -- Pause farming
@@ -648,10 +587,8 @@ local function onInventoryChanged(attributeName, farmButton)
         task.wait(1)
         
         print("Walking to process point at:", postProcessFarmPosition)
-        walkToPosition(postProcessFarmPosition) -- <<<< KEY CHANGE HERE: Use walk function
+        walkToPosition(postProcessFarmPosition) -- Use walk function to process
         
-        -- This code runs only after the walk is complete.
-        -- We check if the process was cancelled by the user during the walk.
         if isWaitingForRockToClear then
             print("Walk finished. Sending 'Process' command to server...")
             NetworkEvent:FireServer("fire", nil, "Process", "Rock")
@@ -692,9 +629,9 @@ local function toggleOreFarmLoop(farmButton)
         local currentRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if currentRootPart then
             lastPosition = currentRootPart.Position
-            print("Starting farm manually. Moving to initial position...")
-            flyMoveTo(initialFarmPosition) -- [MODIFIED]
-            task.wait(1) -- Wait for fly to finish
+            print("Starting farm manually. Teleporting to initial position...")
+            teleportTo(initialFarmPosition) -- [MODIFIED]
+            task.wait(1) -- Wait for teleport to settle
             findAndWalkToClosestOre(nil)
         end
         timeStationary = 0
@@ -763,7 +700,7 @@ end
 -- Buy/Sell/Walk Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
-    flyMoveTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
+    teleportTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
     task.wait(1)
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
     task.wait(0.2)
@@ -773,7 +710,7 @@ end
 local function moveToSellPoint()
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
     print("Moving to sell point...")
-    flyMoveTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
+    teleportTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
 end
 
 local function walkToKealoha()
@@ -820,7 +757,7 @@ local function handleDeathAndRecover()
         task.wait(3)
 
         print("Moving to recovery point (0, -200, 0)...")
-        flyMoveTo(Vector3.new(0, -200, 0)) -- [MODIFIED]
+        teleportTo(Vector3.new(0, -200, 0)) -- [MODIFIED]
 
         task.wait(3)
 
@@ -945,7 +882,7 @@ UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UI
 -- [NEW] Connect the blue label button
 UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
     print("Moving to Blue Label location...")
-    flyMoveTo(Vector3.new(1936, 15, 2285))
+    teleportTo(Vector3.new(1936, 15, 2285))
 end)
 
 
@@ -1015,7 +952,7 @@ end)
 -- If MaxHealth drops to 0, it triggers a special recovery sequence.
 -- ====================================================================================
 task.spawn(function()
-    local statusFolder = LocalPlayer:FindFirstChild("Status")
+    local statusFolder = LocalPlayer:WaitForChild("Status")
     if not statusFolder then
         warn("Health-based recovery: Status folder not found.")
         return
@@ -1056,7 +993,7 @@ task.spawn(function()
                     -- 6. Warp to recovery coordinates
                     local recoveryCoords = Vector3.new(50, -200, 50)
                     print("Warping to recovery location: " .. tostring(recoveryCoords))
-                    flyMoveTo(recoveryCoords)
+                    teleportTo(recoveryCoords)
 
                     -- 7. Wait 5 seconds
                     print("Waiting for 5 seconds before resuming...")
@@ -1105,4 +1042,3 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
-
