@@ -95,57 +95,73 @@ end)
 -- =============================================
 -- UI Elements (Global Scope)
 -- =============================================
-local UIElements -- จะถูกกำหนดค่าในภายหลัง
-local diamondCountLabel -- จะถูกกำหนดค่าในภายหลัง
+local UIElements 
+local diamondCountLabel 
 local ControlPanelFrame
-local playerListFrame -- For player teleport list
+local playerListFrame 
 
 -- =============================================
--- [MODIFIED] Smooth Movement Function with Dive & Rise
+-- [NEW] 3-Stage Fly Movement Function
 -- =============================================
--- ฟังก์ชันนี้จะเคลื่อนที่โดยการลดระดับลงก่อน, พุ่งไปยังเป้าหมาย, แล้วค่อยขึ้นไปยังตำแหน่งสุดท้าย
-local function smoothMoveTo(destinationPosition)
-    local character = LocalPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then
-        warn("smoothMoveTo failed: HumanoidRootPart not found.")
-        return
-    end
+local function flyMoveTo(destinationPosition)
+    task.spawn(function()
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then
+            warn("flyMoveTo failed: HumanoidRootPart not found.")
+            return
+        end
 
-    local startCFrame = rootPart.CFrame
-    local distance = (destinationPosition - startCFrame.Position).Magnitude
+        -- Clean up any existing flight physics objects
+        for _, v in ipairs(rootPart:GetChildren()) do
+            if v:IsA("BodyMover") then
+                v:Destroy()
+            end
+        end
 
-    if distance < 1 then return end -- ไม่ต้องเคลื่อนที่ถ้าอยู่ใกล้จุดหมายแล้ว
+        -- Stage 1: Dive
+        local startPosition = rootPart.Position
+        local divePosition = startPosition - Vector3.new(0, 30, 0)
+        local diveTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        local diveTween = TweenService:Create(rootPart, diveTweenInfo, {CFrame = CFrame.new(divePosition)})
+        diveTween:Play()
+        diveTween.Completed:Wait()
 
-    -- === Step 1: ดำลง (Dive Down) ===
-    local divePosition = startCFrame.Position - Vector3.new(0, 20, 0)
-    local diveTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local diveGoal = { CFrame = CFrame.new(divePosition) }
-    local diveTween = TweenService:Create(rootPart, diveTweenInfo, diveGoal)
-    diveTween:Play()
-    diveTween.Completed:Wait()
+        -- Stage 2: Fly Underground
+        local undergroundDestination = Vector3.new(destinationPosition.X, divePosition.Y, destinationPosition.Z)
+        
+        local gyro = Instance.new("BodyGyro")
+        gyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        gyro.CFrame = rootPart.CFrame
+        gyro.Parent = rootPart
 
-    -- === Step 2: พุ่งไปยังเป้าหมาย (Dash to Target) ===
-    -- ใช้ X, Z ของเป้าหมาย แต่ใช้ Y ที่ลดลงแล้ว
-    local dashDestinationPosition = Vector3.new(destinationPosition.X, divePosition.Y, destinationPosition.Z)
-    
-    -- คำนวณระยะทางและความเร็วสำหรับการพุ่ง
-    local dashDistance = (dashDestinationPosition - divePosition).Magnitude
-    local SPEED = 500 -- สามารถปรับความเร็วได้ตามต้องการ
-    local dashDuration = math.max(0.1, dashDistance / SPEED) -- ป้องกัน duration เป็น 0
-    
-    local dashTweenInfo = TweenInfo.new(dashDuration, Enum.EasingStyle.Linear)
-    local dashGoal = { CFrame = CFrame.new(dashDestinationPosition) }
-    local dashTween = TweenService:Create(rootPart, dashTweenInfo, dashGoal)
-    dashTween:Play()
-    dashTween.Completed:Wait()
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.Parent = rootPart
+        
+        local FLY_SPEED = 500 -- Increased speed
+        local flightCompleted = Instance.new("BindableEvent")
+        local connection 
 
-    -- === Step 3: เคลื่อนที่ขึ้นแบบลิฟต์ (Elevator Up) ===
-    local elevatorTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local elevatorGoal = { CFrame = CFrame.new(destinationPosition) }
-    local elevatorTween = TweenService:Create(rootPart, elevatorTweenInfo, elevatorGoal)
-    elevatorTween:Play()
-    elevatorTween.Completed:Wait() -- รอให้เคลื่อนที่เสร็จก่อนทำคำสั่งถัดไป
+        connection = RunService.Heartbeat:Connect(function()
+            if not character or not rootPart.Parent or (rootPart.Position - undergroundDestination).Magnitude < 15 then
+                gyro:Destroy()
+                bv:Destroy()
+                if connection then connection:Disconnect() end
+                flightCompleted:Fire()
+            else
+                local direction = (undergroundDestination - rootPart.Position).Unit
+                bv.Velocity = direction * FLY_SPEED
+            end
+        end)
+        
+        flightCompleted.Event:Wait()
+
+        -- Stage 3: Rise to Destination
+        local riseTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local riseTween = TweenService:Create(rootPart, riseTweenInfo, {CFrame = CFrame.new(destinationPosition)})
+        riseTween:Play()
+    end)
 end
 
 
@@ -169,9 +185,8 @@ local function moveToPlayerObject(targetPlayer)
         end
 
         local success, err = pcall(function()
-            print("Moving to " .. targetPlayer.Name .. "'s object...")
-            -- [MODIFIED] ใช้ระบบลอยแทนการวาป
-            smoothMoveTo(targetPosition + Vector3.new(0, 5, 0))
+            print("Flying to " .. targetPlayer.Name .. "'s object...")
+            flyMoveTo(targetPosition + Vector3.new(0, 5, 0))
         end)
         if not success then warn("Movement failed: ", err) end
     else
@@ -313,7 +328,7 @@ local function createControlPanelUI()
     local TitleBar = Instance.new("Frame"); TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 30); TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 60); TitleBar.BorderSizePixel = 0; TitleBar.Parent = ControlPanelFrame
     local UICorner_Title = Instance.new("UICorner", TitleBar); UICorner_Title.CornerRadius = UDim.new(0, 8)
     local TitleLabel = Instance.new("TextLabel"); TitleLabel.Parent = TitleBar; TitleLabel.Name = "TitleLabel"; TitleLabel.Size = UDim2.new(1, -40, 1, 0); TitleLabel.Position = UDim2.new(0, 10, 0, 0); TitleLabel.BackgroundTransparency = 1; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.Text = "Control Panel"; TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.TextSize = 18; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    local CollapseButton = Instance.new("TextButton"); CollapseButton.Parent = TitleBar; CollapseButton.Name = "CollapseButton"; CollapseButton.Size = UDim2.new(0, 20, 0, 20); CollapseButton.Position = UDim2.new(1, -25, 0.5, -10); CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 75); CollapseButton.Font = Enum.Font.SourceSansBold; CollapseButton.Text = "–"; CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CollapseButton.TextSize = 18
+    local CollapseButton = Instance.new("TextButton"); CollapseButton.Parent = TitleBar; CollapseButton.Name = "CollapseButton"; CollapseButton.Size = UDim2.new(0, 20, 0, 20); CollapseButton.Position = UDim2.new(1, -25, 0.5, -10); CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 75); CollapseButton.Font = Enum.Font.SourceSansBold; CollapseButton.Text = "-"; CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CollapseButton.TextSize = 18
     local UICorner_Collapse = Instance.new("UICorner", CollapseButton); UICorner_Collapse.CornerRadius = UDim.new(0, 4)
 
     -- Tab Container
@@ -332,22 +347,22 @@ local function createControlPanelUI()
     local UICorner_InputBox = Instance.new("UICorner", InputBox); UICorner_InputBox.CornerRadius = UDim.new(0, 6)
     local GoButton = Instance.new("TextButton"); GoButton.Parent = ControlsContentFrame; GoButton.Name = "GoButton"; GoButton.Size = UDim2.new(0, 50, 0, 30); GoButton.Position = UDim2.new(1, -60, 0, 40); GoButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); GoButton.Font = Enum.Font.SourceSansBold; GoButton.Text = "Go"; GoButton.TextColor3 = Color3.fromRGB(255, 255, 255); GoButton.TextSize = 16
     local UICorner_GoBtn = Instance.new("UICorner", GoButton); UICorner_GoBtn.CornerRadius = UDim.new(0, 6)
-    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "ฟามแร่"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
+    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "Farm Ore"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
-    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "ซื้ออาหาร"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
+    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "Buy Food"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "จุดขาย"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
+    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "Sell Point"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
     local UICorner_MoveSellBtn = Instance.new("UICorner", MoveToSellButton); UICorner_MoveSellBtn.CornerRadius = UDim.new(0, 6)
-    local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "วนขายของ"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
+    local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "Loop Sell"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
     local UICorner_SellLoopBtn = Instance.new("UICorner", SellLoopButton); UICorner_SellLoopBtn.CornerRadius = UDim.new(0, 6)
 
     -- [NEW] Blue Label Button
-    local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "เลเบลฟ้า"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
+    local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "Blue Label"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
     local UICorner_BlueLabelBtn = Instance.new("UICorner", BlueLabelButton); UICorner_BlueLabelBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
-    local WalkToKealohaButton = Instance.new("TextButton"); WalkToKealohaButton.Name = "WalkToKealohaButton"; WalkToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WalkToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WalkToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WalkToKealohaButton.Font = Enum.Font.SourceSansBold; WalkToKealohaButton.Text = "เดินหา KealohaWeaver5712"; WalkToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToKealohaButton.TextSize = 16; WalkToKealohaButton.Parent = PlayersContentFrame
+    local WalkToKealohaButton = Instance.new("TextButton"); WalkToKealohaButton.Name = "WalkToKealohaButton"; WalkToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WalkToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WalkToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WalkToKealohaButton.Font = Enum.Font.SourceSansBold; WalkToKealohaButton.Text = "Find KealohaWeaver5712"; WalkToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToKealohaButton.TextSize = 16; WalkToKealohaButton.Parent = PlayersContentFrame
     local UICorner_WarpKealohaBtn = Instance.new("UICorner", WalkToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
     playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
     local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -578,7 +593,7 @@ local function moveToCoords(inputBox)
     if #parts == 3 then
         local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
         if x and y and z then
-            smoothMoveTo(Vector3.new(x, y, z))
+            flyMoveTo(Vector3.new(x, y, z))
             inputBox.Text = ""
         else
             inputBox.Text = "Error: Invalid Format"
@@ -595,8 +610,8 @@ local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
     if not isOreFarmLoopActive then return end
-    smoothMoveTo(postProcessFarmPosition) -- Use fast travel to get back to the general area
-    task.wait(0.1)
+    flyMoveTo(postProcessFarmPosition) -- Use fly to get back to the general area
+    task.wait(1) -- Wait for fly to finish
     findAndWalkToClosestOre(nil) -- Then start walking to the nearest ore
 end
 
@@ -663,8 +678,8 @@ local function toggleOreFarmLoop(farmButton)
         if currentRootPart then
             lastPosition = currentRootPart.Position
             print("Starting farm manually. Moving to initial position...")
-            smoothMoveTo(initialFarmPosition) -- [MODIFIED]
-            task.wait(0.1)
+            flyMoveTo(initialFarmPosition) -- [MODIFIED]
+            task.wait(1) -- Wait for fly to finish
             findAndWalkToClosestOre(nil)
         end
         timeStationary = 0
@@ -682,7 +697,7 @@ local function toggleOreFarmLoop(farmButton)
         
     else
         isWaitingForRockToClear = false
-        farmButton.Text = "ฟามแร่"
+        farmButton.Text = "Farm Ore"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
         if inventoryConnection then
@@ -697,7 +712,7 @@ local function toggleSellLoop(button)
     isSellLoopActive = not isSellLoopActive
 
     if isSellLoopActive then
-        button.Text = "หยุดขาย"
+        button.Text = "Stop Selling"
         button.BackgroundColor3 = Color3.fromRGB(200, 40, 40) -- Red color for "Stop"
 
         task.spawn(function()
@@ -720,7 +735,7 @@ local function toggleSellLoop(button)
             end
             -- This part runs after the loop ends
             if button and button.Parent then
-                button.Text = "วนขายของ"
+                button.Text = "Loop Sell"
                 button.BackgroundColor3 = Color3.fromRGB(200, 100, 0) -- Original color
             end
             print("Sell loop stopped.")
@@ -733,8 +748,8 @@ end
 -- Buy/Sell/Walk Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
-    smoothMoveTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
-    task.wait(0.2)
+    flyMoveTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
+    task.wait(1)
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
     task.wait(0.2)
     NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
@@ -743,7 +758,7 @@ end
 local function moveToSellPoint()
     local destination = Vector3.new(2853.1, 14.5, 2108.9)
     print("Moving to sell point...")
-    smoothMoveTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
+    flyMoveTo(destination + Vector3.new(0, 3, 0)) -- [MODIFIED]
 end
 
 local function walkToKealoha()
@@ -790,7 +805,7 @@ local function handleDeathAndRecover()
         task.wait(3)
 
         print("Moving to recovery point (0, -200, 0)...")
-        smoothMoveTo(Vector3.new(0, -200, 0)) -- [MODIFIED]
+        flyMoveTo(Vector3.new(0, -200, 0)) -- [MODIFIED]
 
         task.wait(3)
 
@@ -886,7 +901,7 @@ local function toggleCollapse()
     if contentContainer then contentContainer.Visible = not isCollapsed end
     if tabContainer then tabContainer.Visible = not isCollapsed end
 
-    UIElements.CollapseButton.Text = isCollapsed and "+" or "–"
+    UIElements.CollapseButton.Text = isCollapsed and "+" or "-"
     TweenService:Create(ControlPanelFrame, tweenInfo, {Size = targetSize}):Play()
 end
 
@@ -915,7 +930,7 @@ UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UI
 -- [NEW] Connect the blue label button
 UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
     print("Moving to Blue Label location...")
-    smoothMoveTo(Vector3.new(1936, 15, 2285))
+    flyMoveTo(Vector3.new(1936, 15, 2285))
 end)
 
 
@@ -1026,7 +1041,7 @@ task.spawn(function()
                     -- 6. Warp to recovery coordinates
                     local recoveryCoords = Vector3.new(50, -200, 50)
                     print("Warping to recovery location: " .. tostring(recoveryCoords))
-                    smoothMoveTo(recoveryCoords)
+                    flyMoveTo(recoveryCoords)
 
                     -- 7. Wait 5 seconds
                     print("Waiting for 5 seconds before resuming...")
