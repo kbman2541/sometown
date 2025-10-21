@@ -576,41 +576,68 @@ local function onInventoryChanged(attributeName, farmButton)
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
-        isWaitingForRockToClear = true
-        isOreFarmLoopActive = false -- Pause farming
+	if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
+		isWaitingForRockToClear = true
+		isOreFarmLoopActive = false -- Pause farming
 
-        farmButton.Text = "Walking to Process..."
-        farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        
-        print("Rock count reached 100. Waiting 1 second before walking.")
-        task.wait(1)
-        
-        print("Walking to process point at:", postProcessFarmPosition)
-        walkToPosition(postProcessFarmPosition) -- Use walk function to process
-        
-        -- [MODIFIED] Wait for the character to physically arrive before processing
-        -- [[[[[ นี่คือส่วนที่ถูกแก้ไข ]]]]]
-        -- เพิ่มลูปเพื่อตรวจสอบให้แน่ใจว่าตัวละครไปถึงจุดหมายแล้วจริงๆ ก่อนจะสั่งแปรรูป
-        local character = LocalPlayer.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+		farmButton.Text = "Walking to Process..."
+		farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
-        if rootPart and isWaitingForRockToClear then
-            -- Loop until the character is close enough to the target
-            while (rootPart.Position - postProcessFarmPosition).Magnitude > 5 do
-                if not isWaitingForRockToClear then break end -- Exit if player cancelled
-                print("Verifying arrival at processing point...")
-                task.wait(0.5)
-            end
-        end
-		-- [[[[[ จบส่วนที่แก้ไข ]]]]]
+		print("Rock count reached 100. Walking to process point with a 10-second timeout.")
+		task.wait(1)
 
-        if isWaitingForRockToClear then
-            print("Character has arrived. Sending 'Process' command to server...")
-            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-        else
-            print("Walk was cancelled during arrival verification. Not sending 'Process' command.")
-        end
+		-- [[[[[ ใหม่: ตรรกะการจับเวลาสำหรับการเดินไปแปรรูป ]]]]]
+		local walkCompleted = false
+		local walkCancelled = false
+
+		-- Coroutine สำหรับการเดิน เพื่อไม่ให้เทรดหลักค้าง
+		task.spawn(function()
+			-- สิ่งนี้จะทำงานอยู่เบื้องหลัง
+			walkToPosition(postProcessFarmPosition) 
+			-- ตรวจสอบว่าไม่ได้ถูกยกเลิกในระหว่างการเดิน
+			if isWaitingForRockToClear then 
+				walkCompleted = true
+			else
+				walkCancelled = true
+			end
+		end)
+
+		-- ลูปสำหรับจับเวลาและตรวจสอบสถานะ
+		local timeWaited = 0
+		while not walkCompleted and timeWaited < 10 do
+			-- ตรวจสอบการยกเลิกด้วยตนเองจาก UI
+			if not isWaitingForRockToClear then 
+				walkCancelled = true
+				break
+			end
+			task.wait(0.1)
+			timeWaited = timeWaited + 0.1
+		end
+		-- [[[[[ จบ: ตรรกะการจับเวลา ]]]]]
+		
+		-- ถ้าถูกยกเลิกโดยผู้ใช้
+		if walkCancelled then
+			print("Walk to process was cancelled by the user.")
+			return -- ออกจากฟังก์ชัน สถานะ UI จะถูกจัดการที่อื่น
+		end
+
+		-- ถ้าลูปจบลงเพราะหมดเวลา ให้เทเลพอร์ต
+		if not walkCompleted then
+			print("Walk to process point timed out (>10s). Teleporting to destination...")
+			teleportTo(postProcessFarmPosition)
+			task.wait(1) -- รอสักครู่เพื่อให้การเทเลพอร์ตเสร็จสิ้น
+		else
+			print("Walk to process point completed successfully within the time limit.")
+		end
+
+		-- ตอนนี้ ไม่ว่าจะมาถึงด้วยวิธีใด (เดิน, หมดเวลา+เทเลพอร์ต) เราจะทำการแปรรูปแร่
+		if isWaitingForRockToClear then
+			print("Character is at the processing point. Sending 'Process' command to server...")
+			NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+		else
+			-- กรณีนี้ควรถูกดักจับโดย walkCancelled แต่นี่เป็นการป้องกันไว้ก่อน
+			print("Walk was cancelled just before processing. Not sending 'Process' command.")
+		end
 
     elseif isWaitingForRockToClear and rockCount == 0 then
         print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
