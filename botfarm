@@ -436,16 +436,16 @@ local function walkToPosition(destinationPosition)
         local pathBlockedConnection
         local function onPathBlocked(blockedWaypointIndex)
              if blockedWaypointIndex < #waypoints and isWaitingForRockToClear then
-                print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
-                if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                walkToPosition(destinationPosition) -- Recalculate and retry
+                 print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
+                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                 walkToPosition(destinationPosition) -- Recalculate and retry
              end
         end
         pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
 
         for _, waypoint in ipairs(waypoints) do
             -- Check if the process was cancelled (e.g., player manually stopped farming)
-            if not isWaitingForRockToClear then
+            if not isWaitingForRockToClear and not isOreFarmLoopActive then
                 print("Process was cancelled mid-path. Aborting walk.")
                 break
             end
@@ -589,11 +589,27 @@ local function onInventoryChanged(attributeName, farmButton)
         print("Walking to process point at:", postProcessFarmPosition)
         walkToPosition(postProcessFarmPosition) -- Use walk function to process
         
+        -- [MODIFIED] Wait for the character to physically arrive before processing
+        -- [[[[[ นี่คือส่วนที่ถูกแก้ไข ]]]]]
+        -- เพิ่มลูปเพื่อตรวจสอบให้แน่ใจว่าตัวละครไปถึงจุดหมายแล้วจริงๆ ก่อนจะสั่งแปรรูป
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+        if rootPart and isWaitingForRockToClear then
+            -- Loop until the character is close enough to the target
+            while (rootPart.Position - postProcessFarmPosition).Magnitude > 5 do
+                if not isWaitingForRockToClear then break end -- Exit if player cancelled
+                print("Verifying arrival at processing point...")
+                task.wait(0.5)
+            end
+        end
+		-- [[[[[ จบส่วนที่แก้ไข ]]]]]
+
         if isWaitingForRockToClear then
-            print("Walk finished. Sending 'Process' command to server...")
+            print("Character has arrived. Sending 'Process' command to server...")
             NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         else
-            print("Walk was cancelled. Not sending 'Process' command.")
+            print("Walk was cancelled during arrival verification. Not sending 'Process' command.")
         end
 
     elseif isWaitingForRockToClear and rockCount == 0 then
