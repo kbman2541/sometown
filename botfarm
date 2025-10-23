@@ -302,17 +302,17 @@ local function createControlPanelUI()
     local UICorner_InputBox = Instance.new("UICorner", InputBox); UICorner_InputBox.CornerRadius = UDim.new(0, 6)
     local GoButton = Instance.new("TextButton"); GoButton.Parent = ControlsContentFrame; GoButton.Name = "GoButton"; GoButton.Size = UDim2.new(0, 50, 0, 30); GoButton.Position = UDim2.new(1, -60, 0, 40); GoButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200); GoButton.Font = Enum.Font.SourceSansBold; GoButton.Text = "Go"; GoButton.TextColor3 = Color3.fromRGB(255, 255, 255); GoButton.TextSize = 16
     local UICorner_GoBtn = Instance.new("UICorner", GoButton); UICorner_GoBtn.CornerRadius = UDim.new(0, 6)
-    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "Farm Ore"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
+    local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "Farm Ore (Z)"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
-    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "Buy Food"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
+    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "Buy Food (Alt)"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "Sell Point"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
+    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "Sell Point (C)"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
     local UICorner_MoveSellBtn = Instance.new("UICorner", MoveToSellButton); UICorner_MoveSellBtn.CornerRadius = UDim.new(0, 6)
-    local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "Loop Sell"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
+    local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "Loop Sell (V)"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
     local UICorner_SellLoopBtn = Instance.new("UICorner", SellLoopButton); UICorner_SellLoopBtn.CornerRadius = UDim.new(0, 6)
 
     -- [NEW] Blue Label Button
-    local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "Blue Label"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
+    local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "Blue Label (B)"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
     local UICorner_BlueLabelBtn = Instance.new("UICorner", BlueLabelButton); UICorner_BlueLabelBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
@@ -321,6 +321,13 @@ local function createControlPanelUI()
     local UICorner_WarpKealohaBtn = Instance.new("UICorner", WalkToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
     playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
     local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    -- [ปรับปรุง] อัปเดตข้อความบนปุ่มเพื่อแสดงคีย์ลัด
+    FarmOreButton.Text = "Farm Ore (Z)"
+    BuyFoodButton.Text = "Buy Food (Alt)"
+    MoveToSellButton.Text = "Sell Point (C)"
+    SellLoopButton.Text = "Loop Sell (V)"
+    BlueLabelButton.Text = "Blue Label (B)"
 
     return {
         ScreenGui = ScreenGui,
@@ -576,68 +583,68 @@ local function onInventoryChanged(attributeName, farmButton)
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-	if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
-		isWaitingForRockToClear = true
-		isOreFarmLoopActive = false -- Pause farming
+    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
+        isWaitingForRockToClear = true
+        isOreFarmLoopActive = false -- Pause farming
 
-		farmButton.Text = "Walking to Process..."
-		farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        farmButton.Text = "Walking to Process..."
+        farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
-		print("Rock count reached 100. Walking to process point with a 10-second timeout.")
-		task.wait(1)
+        print("Rock count reached 100. Walking to process point with a 10-second timeout.")
+        task.wait(1)
 
-		-- [[[[[ ใหม่: ตรรกะการจับเวลาสำหรับการเดินไปแปรรูป ]]]]]
-		local walkCompleted = false
-		local walkCancelled = false
+        -- [[[[[ ใหม่: ตรรกะการจับเวลาสำหรับการเดินไปแปรรูป ]]]]]
+        local walkCompleted = false
+        local walkCancelled = false
 
-		-- Coroutine สำหรับการเดิน เพื่อไม่ให้เทรดหลักค้าง
-		task.spawn(function()
-			-- สิ่งนี้จะทำงานอยู่เบื้องหลัง
-			walkToPosition(postProcessFarmPosition) 
-			-- ตรวจสอบว่าไม่ได้ถูกยกเลิกในระหว่างการเดิน
-			if isWaitingForRockToClear then 
-				walkCompleted = true
-			else
-				walkCancelled = true
-			end
-		end)
+        -- Coroutine สำหรับการเดิน เพื่อไม่ให้เทรดหลักค้าง
+        task.spawn(function()
+            -- สิ่งนี้จะทำงานอยู่เบื้องหลัง
+            walkToPosition(postProcessFarmPosition) 
+            -- ตรวจสอบว่าไม่ได้ถูกยกเลิกในระหว่างการเดิน
+            if isWaitingForRockToClear then 
+                walkCompleted = true
+            else
+                walkCancelled = true
+            end
+        end)
 
-		-- ลูปสำหรับจับเวลาและตรวจสอบสถานะ
-		local timeWaited = 0
-		while not walkCompleted and timeWaited < 10 do
-			-- ตรวจสอบการยกเลิกด้วยตนเองจาก UI
-			if not isWaitingForRockToClear then 
-				walkCancelled = true
-				break
-			end
-			task.wait(0.1)
-			timeWaited = timeWaited + 0.1
-		end
-		-- [[[[[ จบ: ตรรกะการจับเวลา ]]]]]
-		
-		-- ถ้าถูกยกเลิกโดยผู้ใช้
-		if walkCancelled then
-			print("Walk to process was cancelled by the user.")
-			return -- ออกจากฟังก์ชัน สถานะ UI จะถูกจัดการที่อื่น
-		end
+        -- ลูปสำหรับจับเวลาและตรวจสอบสถานะ
+        local timeWaited = 0
+        while not walkCompleted and timeWaited < 10 do
+            -- ตรวจสอบการยกเลิกด้วยตนเองจาก UI
+            if not isWaitingForRockToClear then 
+                walkCancelled = true
+                break
+            end
+            task.wait(0.1)
+            timeWaited = timeWaited + 0.1
+        end
+        -- [[[[[ จบ: ตรรกะการจับเวลา ]]]]]
+        
+        -- ถ้าถูกยกเลิกโดยผู้ใช้
+        if walkCancelled then
+            print("Walk to process was cancelled by the user.")
+            return -- ออกจากฟังก์ชัน สถานะ UI จะถูกจัดการที่อื่น
+        end
 
-		-- ถ้าลูปจบลงเพราะหมดเวลา ให้เทเลพอร์ต
-		if not walkCompleted then
-			print("Walk to process point timed out (>10s). Teleporting to destination...")
-			teleportTo(postProcessFarmPosition)
-			task.wait(1) -- รอสักครู่เพื่อให้การเทเลพอร์ตเสร็จสิ้น
-		else
-			print("Walk to process point completed successfully within the time limit.")
-		end
+        -- ถ้าลูปจบลงเพราะหมดเวลา ให้เทเลพอร์ต
+        if not walkCompleted then
+            print("Walk to process point timed out (>10s). Teleporting to destination...")
+            teleportTo(postProcessFarmPosition)
+            task.wait(1) -- รอสักครู่เพื่อให้การเทเลพอร์ตเสร็จสิ้น
+        else
+            print("Walk to process point completed successfully within the time limit.")
+        end
 
-		-- ตอนนี้ ไม่ว่าจะมาถึงด้วยวิธีใด (เดิน, หมดเวลา+เทเลพอร์ต) เราจะทำการแปรรูปแร่
-		if isWaitingForRockToClear then
-			print("Character is at the processing point. Sending 'Process' command to server...")
-			NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-		else
-			-- กรณีนี้ควรถูกดักจับโดย walkCancelled แต่นี่เป็นการป้องกันไว้ก่อน
-			print("Walk was cancelled just before processing. Not sending 'Process' command.")
-		end
+        -- ตอนนี้ ไม่ว่าจะมาถึงด้วยวิธีใด (เดิน, หมดเวลา+เทเลพอร์ต) เราจะทำการแปรรูปแร่
+        if isWaitingForRockToClear then
+            print("Character is at the processing point. Sending 'Process' command to server...")
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
+        else
+            -- กรณีนี้ควรถูกดักจับโดย walkCancelled แต่นี่เป็นการป้องกันไว้ก่อน
+            print("Walk was cancelled just before processing. Not sending 'Process' command.")
+        end
 
     elseif isWaitingForRockToClear and rockCount == 0 then
         print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
@@ -692,7 +699,7 @@ local function toggleOreFarmLoop(farmButton)
         
     else
         isWaitingForRockToClear = false
-        farmButton.Text = "Farm Ore"
+        farmButton.Text = "Farm Ore (Z)"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
         if inventoryConnection then
@@ -730,7 +737,7 @@ local function toggleSellLoop(button)
             end
             -- This part runs after the loop ends
             if button and button.Parent then
-                button.Text = "Loop Sell"
+                button.Text = "Loop Sell (V)"
                 button.BackgroundColor3 = Color3.fromRGB(200, 100, 0) -- Original color
             end
             print("Sell loop stopped.")
@@ -929,12 +936,37 @@ UIElements.BlueLabelButton.MouseButton1Click:Connect(function()
 end)
 
 
--- [MODIFIED] Keybind to toggle the main control panel changed to 'T'
+-- =============================================
+-- [[[[[ บล็อคที่แก้ไข ]]]]]
+-- เพิ่มคีย์ลัดตามที่ผู้ใช้ร้องขอ
+-- =============================================
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent then return end
 
     if input.KeyCode == Enum.KeyCode.T then
         UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
+        
+    -- [NEW] Hotkeys for buttons
+    elseif input.KeyCode == Enum.KeyCode.Z then
+        print("Key Z pressed: Toggling Farm Ore")
+        toggleOreFarmLoop(UIElements.FarmOreButton)
+        
+    elseif input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
+        print("Key Alt pressed: Buying Food")
+        buyFood()
+        
+    elseif input.KeyCode == Enum.KeyCode.C then
+        print("Key C pressed: Moving to Sell Point")
+        moveToSellPoint()
+        
+    elseif input.KeyCode == Enum.KeyCode.V then
+        print("Key V pressed: Toggling Sell Loop")
+        toggleSellLoop(UIElements.SellLoopButton)
+        
+    elseif input.KeyCode == Enum.KeyCode.B then
+        print("Key B pressed: Moving to Blue Label")
+        teleportTo(Vector3.new(1936, 15, 2285))
+        
     end
 end)
 
@@ -1085,3 +1117,4 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
