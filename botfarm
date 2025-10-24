@@ -935,6 +935,12 @@ UIElements.BlueLabelButton.MouseButton1Click:Connect(function()
     teleportTo(Vector3.new(1936, 15, 2285))
 end)
 
+-- [[[[[ บล็อคใหม่ ]]]]]
+-- พับ UI ตอนเริ่มต้นเกมตามที่ผู้ใช้ร้องขอ
+print("Collapsing UI on start...")
+toggleCollapse() 
+-- [[[[[ จบ ]]]]]
+
 
 -- =============================================
 -- [[[[[ บล็อคที่แก้ไข ]]]]]
@@ -1149,3 +1155,4 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
