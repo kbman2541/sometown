@@ -1,0 +1,168 @@
+-- ================== Services ==================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+
+-- ================== Configuration ==================
+local TARGET_SERVER_NUMBER = "" -- <<-- ใส่แค่ "เลข" เซิร์ฟเวอร์ที่ต้องการ เช่น 10, ถ้าเว้นว่างไว้จะสุ่มหาเซิร์ฟเวอร์
+local TARGET_UI_NAME = "serverlistUI" -- UI ที่เฝ้าดู
+local MAX_PLAYERS = 30
+local RETRY_DELAY_SECONDS = 30
+
+-- ================== Variables ==================
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local teleportFunc = ReplicatedStorage:WaitForChild("func")
+local serversFolder = ReplicatedStorage:WaitForChild("Servers")
+
+local lastAttemptTime = 0
+local isTeleporting = false
+
+-- ================== Event Handling ==================
+local function onTeleportFailed(player, teleportResult, errorMessage)
+    warn("Teleport Failed! Reason: " .. tostring(errorMessage))
+    isTeleporting = false
+    lastAttemptTime = os.clock()
+end
+
+-- หากเกมมี TeleportInitFailed
+if game:GetService("TeleportService").TeleportInitFailed then
+    game:GetService("TeleportService").TeleportInitFailed:Connect(onTeleportFailed)
+end
+
+-- ================== Core Functions ==================
+local function findAndCloseErrorDialog()
+    local guisToSearch = {playerGui, CoreGui}
+    for _, guiContainer in ipairs(guisToSearch) do
+        pcall(function()
+            for _, descendant in ipairs(guiContainer:GetDescendants()) do
+                if descendant:IsA("TextLabel") then
+                    local text = descendant.Text
+                    if string.find(text, "Teleport Failed") or string.find(text, "Error Code: 773") then
+                        local screenGui = descendant:FindFirstAncestorOfClass("ScreenGui")
+                        if screenGui and screenGui.Parent then
+                            print("พบหน้าต่างข้อผิดพลาดแล้วลบ: " .. screenGui.Name)
+                            screenGui:Destroy()
+                            isTeleporting = false
+                            lastAttemptTime = os.clock()
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+local function teleportToSpecificServer(serverNumber)
+    if not serversFolder then
+        warn("ไม่พบโฟลเดอร์ 'Servers'")
+        return
+    end
+
+    local targetServerName = "SERVER " .. serverNumber
+    local foundServer = nil
+    for _, serverInstance in ipairs(serversFolder:GetChildren()) do
+        if serverInstance:IsA("StringValue") and serverInstance.Name == targetServerName then
+            foundServer = serverInstance
+            break
+        end
+    end
+
+    if foundServer then
+        local jobId = string.gsub(foundServer.Value, "%s*nil$", "")
+        if jobId == "" then
+             warn("เซิร์ฟเวอร์เป้าหมาย (" .. targetServerName .. ") ไม่มี JobId, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
+             lastAttemptTime = os.clock()
+             return
+        end
+
+        local currentPlayers = foundServer:GetAttribute("Players")
+        local serverType = foundServer:GetAttribute("ServerType")
+
+        if currentPlayers and serverType ~= "Private" then
+            if currentPlayers < MAX_PLAYERS then
+                print("กำลังเทเลพอร์ตไปเซิร์ฟเวอร์เป้าหมาย " .. targetServerName .. " (JobId: " .. jobId .. ")")
+                isTeleporting = true
+                lastAttemptTime = os.clock()
+                teleportFunc:InvokeServer("teleport", jobId)
+            else
+                warn("เซิร์ฟเวอร์เป้าหมาย (" .. targetServerName .. ") เต็ม, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
+                lastAttemptTime = os.clock()
+            end
+        else
+            warn("ไม่สามารถรับข้อมูลของเซิร์ฟเวอร์เป้าหมาย (" .. targetServerName .. ") ได้ หรือเป็นเซิร์ฟเวอร์ส่วนตัว")
+            lastAttemptTime = os.clock()
+        end
+    else
+        warn("ไม่พบเซิร์ฟเวอร์เป้าหมาย (" .. targetServerName .. ") ในรายการ, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
+        lastAttemptTime = os.clock()
+    end
+end
+
+
+local function findAndTeleportToRandomServer()
+    if not serversFolder then
+        warn("ไม่พบโฟลเดอร์ 'Servers'")
+        return
+    end
+
+    local eligibleServers = {}
+
+    for _, serverInstance in ipairs(serversFolder:GetChildren()) do
+        if string.match(serverInstance.Name, "^SERVER") and serverInstance:IsA("StringValue") then
+            local currentPlayers = serverInstance:GetAttribute("Players")
+            local serverType = serverInstance:GetAttribute("ServerType")
+            local serverData = string.gsub(serverInstance.Value, "%s*nil$", "")
+            if currentPlayers and serverData ~= "" and serverType ~= "Private" then
+                if currentPlayers < MAX_PLAYERS then
+                    table.insert(eligibleServers, serverData)
+                end
+            end
+        end
+    end
+
+    if #eligibleServers > 0 then
+        local randomIndex = math.random(1, #eligibleServers)
+        local targetServerData = eligibleServers[randomIndex]
+
+        print("กำลังเทเลพอร์ตไปเซิร์ฟเวอร์ JobId: " .. tostring(targetServerData))
+        isTeleporting = true
+        lastAttemptTime = os.clock()
+        teleportFunc:InvokeServer("teleport", targetServerData)
+    else
+        warn("ไม่พบเซิร์ฟเวอร์ที่ว่าง, จะลองอีกครั้งใน " .. RETRY_DELAY_SECONDS .. " วินาที")
+        lastAttemptTime = os.clock()
+    end
+end
+
+-- ================== Main Loop ==================
+if TARGET_SERVER_NUMBER ~= "" then
+    print("TeleportManagerUI (Specific) เริ่มทำงาน, เป้าหมายเซิร์ฟเวอร์: 'SERVER "..TARGET_SERVER_NUMBER.."'")
+else
+    print("TeleportManagerUI (Random) เริ่มทำงาน เฝ้าระวัง UI '"..TARGET_UI_NAME.."'")
+end
+
+
+while true do
+    task.wait(1)
+    findAndCloseErrorDialog()
+
+    local serverlistUI = playerGui:FindFirstChild(TARGET_UI_NAME)
+
+    if serverlistUI and serverlistUI.Enabled then
+        if os.clock() > lastAttemptTime + RETRY_DELAY_SECONDS and not isTeleporting then
+            if TARGET_SERVER_NUMBER ~= "" then
+                print("พบ UI '"..TARGET_UI_NAME.."', กำลังพยายามเข้าเซิร์ฟเวอร์: " .. TARGET_SERVER_NUMBER)
+                teleportToSpecificServer(TARGET_SERVER_NUMBER)
+            else
+                print("พบ UI '"..TARGET_UI_NAME.."', เริ่มสุ่มเซิร์ฟเวอร์")
+                findAndTeleportToRandomServer()
+            end
+        end
+    else
+        if lastAttemptTime ~= 0 and not isTeleporting then
+            lastAttemptTime = 0
+        end
+    end
+end
+
