@@ -1022,6 +1022,38 @@ task.spawn(function()
 end)
 
 -- ====================================================================================
+-- [[[[[ บล็อคใหม่ ]]]]]
+-- ลูปตรวจสอบตำแหน่งฟาร์ม
+-- ลูปนี้จะตรวจสอบทุก 1 นาที ว่าผู้เล่นอยู่ไกลจากจุดฟาร์มเกินไปหรือไม่
+-- ในขณะที่เปิดใช้งานการฟาร์มอยู่
+-- ====================================================================================
+task.spawn(function()
+    while task.wait(60) do -- ทำงานทุก 1 นาที
+        -- รันการตรวจสอบนี้เฉพาะเมื่อลูปฟาร์มทำงานอยู่ และไม่ได้อยู่ในกระบวนการแปรรูปแร่
+        if isOreFarmLoopActive and not isWaitingForRockToClear then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+                
+                if rootPart then
+                    local currentPosition = rootPart.Position
+                    -- ใช้ 'initialFarmPosition' เป็นจุดอ้างอิงของ "จุดฟาร์ม"
+                    local farmPoint = initialFarmPosition 
+                    
+                    local distance = (currentPosition - farmPoint).Magnitude
+                    
+                    if distance > 1000 then
+                        print("Player is " .. string.format("%.0f", distance) .. " studs away from the farm point. Teleporting back...")
+                        teleportTo(farmPoint)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+
+-- ====================================================================================
 -- [[ NEW ]] Health-Based Recovery Loop
 -- This loop listens for the 'MaxHealth' attribute in the Player's Status folder.
 -- If MaxHealth drops to 0, it triggers a special recovery sequence.
@@ -1117,4 +1149,3 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
-
