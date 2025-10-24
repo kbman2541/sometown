@@ -709,7 +709,10 @@ local function toggleOreFarmLoop(farmButton)
     end
 end
 
--- [NEW] Toggle Sell Loop
+-- ===================================================================
+-- [[[[[ บล็อคที่แก้ไข ]]]]]
+-- [MODIFIED] Toggle Sell Loop (ตรวจสอบ Attributes ในกระเป๋า)
+-- ===================================================================
 local function toggleSellLoop(button)
     isSellLoopActive = not isSellLoopActive
 
@@ -719,22 +722,42 @@ local function toggleSellLoop(button)
 
         task.spawn(function()
             print("Sell loop started.")
+            
+            -- [NEW] รายการไอเท็มที่จะขายจาก inventory attributes
+            local itemsToSell = {"Rockfragments", "Soil", "Iron", "Copper", "Gold"}
+
             while isSellLoopActive do
-                if NetworkEvent then
-                    pcall(function()
-                        NetworkEvent:FireServer("fire", nil, "Economy", "Rockfragments", 50)
-                        NetworkEvent:FireServer("fire", nil, "Economy", "Soil", 5)
-                        NetworkEvent:FireServer("fire", nil, "Economy", "Iron", 10)
-                        NetworkEvent:FireServer("fire", nil, "Economy", "Copper", 10)
-                        NetworkEvent:FireServer("fire", nil, "Economy", "Gold", 10)
-                    end)
-                else
+                if not NetworkEvent then
                     warn("Sell Loop: NetworkEvent is not available.")
-                    isSellLoopActive = false -- Stop the loop if the event is missing
+                    isSellLoopActive = false -- Stop the loop
                     break
                 end
-                task.wait(0.5) -- Wait half a second before repeating
+                
+                if not inventoryFolder then
+                    warn("Sell Loop: inventoryFolder is not found.")
+                    isSellLoopActive = false -- Stop the loop
+                    break
+                end
+
+                -- [NEW] วนลูปแต่ละไอเท็มและขายทั้งหมด
+                for _, itemName in ipairs(itemsToSell) do
+                    if not isSellLoopActive then break end -- ตรวจสอบอีกครั้ง เผื่อถูกสั่งหยุดกลางคัน
+                    
+                    local quantity = inventoryFolder:GetAttribute(itemName)
+                    
+                    -- ตรวจสอบว่ามีไอเท็มอยู่จริง (เป็นตัวเลข และมากกว่า 0)
+                    if quantity and type(quantity) == "number" and quantity > 0 then
+                        pcall(function()
+                            print("Selling " .. tostring(quantity) .. " of " .. itemName)
+                            NetworkEvent:FireServer("fire", nil, "Economy", itemName, quantity)
+                        end)
+                        task.wait(0.1) -- หน่วงเวลาเล็กน้อยระหว่างการขายแต่ละรายการ
+                    end
+                end
+                
+                task.wait(0.5) -- รอ 0.5 วินาที ก่อนที่จะเริ่มวนลูปขายใหม่ทั้งหมด
             end
+            
             -- This part runs after the loop ends
             if button and button.Parent then
                 button.Text = "Loop Sell (V)"
@@ -746,6 +769,10 @@ local function toggleSellLoop(button)
         -- The loop will stop on its own when isSellLoopActive becomes false
     end
 end
+-- ===================================================================
+-- [[[[[ จบ บล็อคที่แก้ไข ]]]]]
+-- ===================================================================
+
 
 -- Buy/Sell/Walk Functions
 local function buyFood()
@@ -1096,7 +1123,7 @@ task.spawn(function()
                     task.wait(30)
 
                     -- 4. Go to buy food again
-                    print("Moving to buy food (Attempt 2)...")
+                        print("Moving to buy food (Attempt 2)...")
                     buyFood()
 
                     -- 5. Wait 2 seconds
