@@ -483,6 +483,9 @@ local currentTargetOre = nil
 local timeAtOreStationary = 0
 local isSellLoopActive = false 
 
+-- [ใหม่] เพิ่มตัวแปรสถานะเพื่อป้องกันการยิงอีเวนต์ซ้ำ
+local isMining = false
+
 -- Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
     if not inventoryFolder then 
@@ -570,6 +573,8 @@ local function findAndWalkToClosestOre(oreToExclude)
             -- ฟังก์ชัน onCancelled: คืนค่า true ถ้ายังฟาร์มอยู่, false ถ้ายกเลิก
             return isOreFarmLoopActive
         end)
+        
+        isMining = false -- [ใหม่] รีเซ็ตสถานะการขุด เมื่อหาแร่ใหม่
         
     else
         currentTargetOre = nil
@@ -738,6 +743,8 @@ local function toggleOreFarmLoop(farmButton)
             inventoryConnection:Disconnect()
             inventoryConnection = nil
         end
+        
+        isMining = false -- [ใหม่] รีเซ็ตสถานะการขุด เมื่อหยุดฟาร์ม
     end
 end
 
@@ -915,7 +922,7 @@ print("Death recovery system connected for initial character.")
 
 -- =============================================
 -- [ปรับปรุง] Update Loop (RenderStepped)
--- [ใหม่] "ฉลาดขึ้น" ด้วยการตรวจจับว่าแร่ถูกขุดไปแล้วหรือยัง
+-- [ผสาน] เพิ่มตรรกะการขุดแร่จากที่คุณให้มา
 -- =============================================
 RunService.RenderStepped:Connect(function(deltaTime)
     if HumanoidRootPart and not isCollapsed then
@@ -959,12 +966,39 @@ RunService.RenderStepped:Connect(function(deltaTime)
 
         -- [ใช้ Config]
         if isStationary and distToTarget <= Config.AtOreDistanceThreshold then
+            
+            -- [[[[[ บล็อคที่ผสานใหม่ ]]]]]
+            -- เมื่อเดินมาถึงแร่ และยังไม่ได้เริ่มขุด
+            if timeAtOreStationary == 0 and not isMining then
+                isMining = true -- ตั้งค่าสถานะว่ากำลังขุดแร่นี้
+                print("Arrived at ore: " .. currentTargetOre.Name .. ". Firing 'farm-event'.")
+                
+                local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    -- ใช้โครงสร้างอีเวนต์ที่คุณให้มา
+                    -- เราส่ง nil สำหรับ path (args[5])
+                    -- เพราะสคริปต์ของเราใช้การค้นหาแบบไดนามิก
+                    local args = {
+                        "invoke",
+                        "1761427902372148",
+                        "farm-event",
+                        humanoid,
+                        nil -- ส่ง nil แทนที่ hardcoded path
+                    }
+                    
+                    pcall(function()
+                        NetworkEvent:FireServer(unpack(args))
+                    end)
+                end
+            end
+            -- [[[[[ จบ บล็อคที่ผสานใหม่ ]]]]]
+            
             timeAtOreStationary += deltaTime
             
             -- [ใช้ Config]
             if timeAtOreStationary >= Config.AtOreStuckTime then
                 print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
-                findAndWalkToClosestOre(currentTargetOre)
+                findAndWalkToClosestOre(currentTargetOre) -- isMining จะถูกรีเซ็ตในฟังก์ชันนี้
                 timeStationary = 0
                 timeAtOreStationary = 0
             end
@@ -973,6 +1007,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
         end
     else
         timeAtOreStationary = 0
+        isMining = false -- [ใหม่] รีเซ็ตสถานะ ถ้าไม่มีเป้าหมาย
     end
 end)
 
@@ -1221,3 +1256,4 @@ end)
 -- Auto-start the farm loop
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
+
