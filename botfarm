@@ -1,50 +1,7 @@
 -- =============================================
--- [ใหม่] Configuration Block (ตั้งค่าทั้งหมดที่นี่)
--- การย้ายการตั้งค่าทั้งหมดมาไว้ที่เดียว ทำให้ "ฉลาดขึ้น" เพราะแก้ไขได้ง่ายในอนาคต
+-- Settings
 -- =============================================
-local Config = {
-    -- ชื่อ Attribute ที่จะแสดงบน UI (เช่น Diamond)
-    CounterAttributeName = "Diamond",
-
-    -- การตั้งค่าปุ่มลัด (Hotkeys)
-    ToggleUIKey = Enum.KeyCode.T,
-    FarmOreKey = Enum.KeyCode.Z,
-    BuyFoodKey = Enum.KeyCode.B, -- [แก้ไข] เปลี่ยนจาก LeftAlt
-    SellPointKey = Enum.KeyCode.G, -- [แก้ไข] เปลี่ยนจาก C
-    SellLoopKey = Enum.KeyCode.V,
-    BlueLabelKey = Enum.KeyCode.N, -- [แก้ไข] เปลี่ยนจาก B
-
-    -- พิกัด (Coordinates)
-    FarmInitialPosition = Vector3.new(-296, 12, -2489),
-    FarmProcessPosition = Vector3.new(-296, 12, -2489),
-    FoodShopPosition = Vector3.new(3000, 16, 2280),
-    SellPointPosition = Vector3.new(2853.1, 14.5, 2108.9),
-    BlueLabelPosition = Vector3.new(1936, 15, 2285),
-    DeathRecoveryPosition = Vector3.new(0, -200, 0),
-    -- HealthRecoveryPosition ถูกลบออกเนื่องจากตรรกะใหม่
-
-    -- รายการไอเทมที่จะขายอัตโนมัติ (สำหรับ Loop Sell)
-    ItemsToSell = {"Rockfragments", "Soil", "Iron", "Copper", "Gold"},
-
-    -- การตั้งค่าการฟาร์ม และ Anti-Stuck
-    FarmFullAmount = 100, -- จำนวน "Rock" ที่จะถือว่าเต็ม
-    ProcessWalkTimeout = 10, -- (วินาที) เวลารอสูงสุดก่อนที่จะเทเลพอร์ตไปแปรรูป
-    ProcessWaitTime = 5, -- (วินาที) เวลารอหลังแปรรูปเสร็จ
-    GeneralStuckTime = 5, -- (วินาที) เวลาที่หยุดนิ่งทั่วไปก่อนจะหาทางใหม่
-    AtOreStuckTime = 10, -- (วินาที) เวลาที่หยุดนิ่ง *ที่แร่* ก่อนจะหาแร่ก้อนใหม่
-    AtOreDistanceThreshold = 3, -- (Studs) ระยะห่างที่จะถือว่า "อยู่ที่แร่"
-    FarmAreaCheckDistance = 1000, -- (Studs) ระยะห่างจากจุดฟาร์มก่อนที่จะวาร์ปกลับ
-    FarmAreaCheckInterval = 60, -- (วินาที) ตรวจสอบทุกๆ 1 นาที
-
-    -- การตั้งค่าการกิน/ดื่ม อัตโนมัติ
-    AutoEatThreshold = 70, -- (เปอร์เซ็นต์) ถ้าค่าสถานะต่ำกว่านี้ จะกิน/ดื่ม
-    AutoEatCheckInterval = 5, -- (วินาที)
-
-    -- การตั้งค่า Anti-AFK
-    AntiAFKInterval = 240, -- (วินาที) กดปุ่มทุกๆ 4 นาที
-
-    -- [แก้ไข] ลบการตั้งค่าการกู้คืนเก่าออก
-}
+local DIAMOND_ATTRIBUTE_NAME = "Diamond" -- Attribute to display on the counter UI.
 
 -- =============================================
 -- Service Definitions
@@ -56,23 +13,31 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- =============================================
--- [ปรับปรุง] Anti-Cheat Bypass (ทำให้เงียบลง)
+-- [NEW] Anti-Cheat Bypass
+-- This section attempts to prevent other scripts from teleporting or kicking the player,
+-- which can happen if an anti-cheat script detects the fast movement from this script.
+-- It works by intercepting calls to TeleportService and blocking them.
 -- =============================================
 pcall(function()
     local TeleportService = game:GetService("TeleportService")
     local mt = getrawmetatable(TeleportService)
     local oldIndex = mt.__index
 
+    -- We replace the __index metamethod. This function is called whenever a script tries
+    -- to access a method of TeleportService (like "Teleport" or "TeleportAsync").
     setmetatable(TeleportService, {
         __index = function(self, key)
+            -- Check if the key being accessed is one of the teleport functions.
             if key == "Teleport" or key == "TeleportAsync" or key == "TeleportToPrivateServer" or key == "TeleportToPlaceInstance" then
+                -- If it is, we return a new, empty function instead of the real one.
+                -- This effectively blocks the teleport call from ever happening.
                 return function(...)
-                    print("A script attempted to teleport the player. Call was blocked by UpdatedMovementScript.lua.")
+                    warn("A script attempted to teleport the player (Reason: " .. tostring(key) .. "). Call was blocked by UpdatedMovementScript.lua to prevent a kick.")
                 end
             end
+            -- If it's any other property or method, we let it proceed as normal using the original __index.
             return oldIndex(self, key)
         end
     })
@@ -80,18 +45,22 @@ pcall(function()
 end)
 
 -- =============================================
--- [ปรับปรุง] Workspace.Folder cleanup
+-- [MODIFIED] Make workspace.Folder cleanup more robust
 -- =============================================
+-- Initial check in case the folder already exists at script start
+local existingFolder = Workspace:FindFirstChild("Folder")
+if existingFolder then
+    existingFolder:Destroy()
+    print("Workspace.Folder found on startup and was deleted.")
+end
+
+-- Listen for the folder being added in the future to ensure it's always deleted
 Workspace.ChildAdded:Connect(function(child)
     if child.Name == "Folder" then
-        task.wait() 
+        task.wait() -- Allow the object to be fully parented before destroying
         child:Destroy()
         print("Workspace.Folder was added and has now been deleted.")
     end
-end)
-pcall(function()
-    Workspace:FindFirstChild("Folder"):Destroy()
-    print("Workspace.Folder found on startup and was deleted.")
 end)
 
 
@@ -101,55 +70,27 @@ if not RunService:IsClient() then
 end
 
 -- =============================================
--- [ใหม่] Helper Function (ฟังก์ชันช่วยเหลือ)
--- =============================================
-local function SafeWaitForChild(parent, childName, timeout)
-    timeout = timeout or 5 -- 5 วินาที
-    local startTime = tick()
-    while tick() - startTime < timeout do
-        local child = parent:FindFirstChild(childName)
-        if child then
-            return child
-        end
-        task.wait()
-    end
-    warn("SafeWaitForChild timed out waiting for '" .. childName .. "' in '" .. parent.Name .. "'")
-    return nil
-end
-
--- =============================================
 -- Local Player & Character Setup
 -- =============================================
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = SafeWaitForChild(LocalPlayer, "PlayerGui")
-if not PlayerGui then return end -- หยุดทำงานถ้า PlayerGui ไม่มี
-
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = SafeWaitForChild(Character, "HumanoidRootPart", 10)
-local inventoryFolder = SafeWaitForChild(LocalPlayer, "Inventory", 10)
-local statusFolder = SafeWaitForChild(LocalPlayer, "Status", 10)
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local inventoryFolder = LocalPlayer:WaitForChild("Inventory")
+local statusFolder = LocalPlayer:WaitForChild("Status") -- [NEW]
 local NetworkEvent
 
 -- Safely get NetworkEvent
 pcall(function()
-    local modules = SafeWaitForChild(ReplicatedStorage, "Modules", 10)
-    if modules then
-        local networkFramework = SafeWaitForChild(modules, "NetworkFramework", 10)
-        if networkFramework then
-            NetworkEvent = SafeWaitForChild(networkFramework, "NetworkEvent", 10)
-        end
-    end
-    if not NetworkEvent then
-        warn("Could not find NetworkEvent. Many functions will fail.")
-    end
+    NetworkEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("NetworkFramework"):WaitForChild("NetworkEvent")
 end)
 
--- Clean up old UI
+-- Clean up old UI if it exists
 pcall(function()
     if PlayerGui:FindFirstChild("CoordinateUI") then PlayerGui.CoordinateUI:Destroy() end
     if PlayerGui:FindFirstChild("PlayerTeleportGui") then PlayerGui.PlayerTeleportGui:Destroy() end
     if PlayerGui:FindFirstChild("CombinedControlUI") then PlayerGui.CombinedControlUI:Destroy() end
-    if PlayerGui:FindFirstChild("ItemCounterGui") then PlayerGui.ItemCounterGui:Destroy() end
+    if PlayerGui:FindFirstChild("ItemCounterGui") then PlayerGui.ItemCounterGui:Destroy() end -- Cleanup for diamond counter
 end)
 
 -- =============================================
@@ -161,82 +102,30 @@ local ControlPanelFrame
 local playerListFrame 
 
 -- =============================================
--- [ปรับปรุง] ระบบการเคลื่อนที่
+-- [เปลี่ยน] ฟังก์ชันเคลื่อนที่ด้วยการเทเลพอร์ต
+-- ฟังก์ชันนี้ถูกเปลี่ยนจากการบินมาเป็นการเทเลพอร์ตทันที
 -- =============================================
-local function instantTeleportTo(destinationPosition)
+local function teleportTo(destinationPosition)
     task.spawn(function()
-        local char = LocalPlayer.Character
-        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         if not rootPart then
-            warn("instantTeleportTo failed: Character or HumanoidRootPart not found.")
+            warn("teleportTo failed: Character or HumanoidRootPart not found.")
             return
         end
-        rootPart.CFrame = CFrame.new(destinationPosition)
-        print("Instantly Teleported to " .. tostring(destinationPosition))
+
+        -- [NEW] เพิ่มความสูง 5 studs เพื่อป้องกันการตกแมพ
+        local finalPosition = destinationPosition + Vector3.new(0, 5, 0)
+
+        -- ย้ายตัวละครทันทีโดยการตั้งค่า CFrame
+        rootPart.CFrame = CFrame.new(finalPosition)
+        print("Teleported to " .. tostring(finalPosition))
     end)
-end
-
--- ===================================================================
--- ฟังก์ชันการเดิน Pathfinding (สำหรับการฟาร์มระยะใกล้)
--- ===================================================================
-local function walkToPosition(destinationPosition, onCancelled)
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-
-    if not (humanoid and rootPart and humanoid.Health > 0) then return end
-
-    print("Walking (Pathfind) to position:", destinationPosition, ". Calculating path...")
-
-    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
-    local path = PathfindingService:CreatePath(agentParameters)
-
-    local success, errorMessage = pcall(function()
-        path:ComputeAsync(rootPart.Position, destinationPosition)
-    end)
-
-    if success and path.Status == Enum.PathStatus.Success then
-        print("Path calculated. Following waypoints...")
-        local waypoints = path:GetWaypoints()
-
-        local pathBlockedConnection
-        local function onPathBlocked(blockedWaypointIndex)
-             if blockedWaypointIndex < #waypoints and onCancelled and onCancelled() then
-                 print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
-                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-                 walkToPosition(destinationPosition, onCancelled) -- Recalculate and retry
-             end
-        end
-        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
-
-        for _, waypoint in ipairs(waypoints) do -- [แก้ไข] เพิ่ม 'do' ที่ขาดไป
-            if onCancelled and not onCancelled() then
-                print("Process was cancelled mid-path. Aborting walk.")
-                break
-            end
-            
-            humanoid:MoveTo(waypoint.Position)
-
-            if waypoint.Action == Enum.PathWaypointAction.Jump then
-                humanoid.Jump = true
-            end
-
-            humanoid.MoveToFinished:Wait()
-        end
-
-        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
-        print("Reached destination or path ended.")
-    else
-        warn("Pathfinding to position failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
-        humanoid:MoveTo(destinationPosition)
-        humanoid.MoveToFinished:Wait()
-    end
 end
 
 
 -- =============================================
--- Teleport to Player Logic (ใช้ Teleport)
+-- Teleport to Player Logic
 -- =============================================
 local function moveToPlayerObject(targetPlayer)
     local localCharacter = LocalPlayer.Character
@@ -256,7 +145,8 @@ local function moveToPlayerObject(targetPlayer)
 
         local success, err = pcall(function()
             print("Teleporting to " .. targetPlayer.Name .. "'s object...")
-            instantTeleportTo(targetPosition + Vector3.new(0, 5, 0))
+            -- [REMOVED] ลบ offset เดิม (Vector3.new(0, 5, 0)) ออก เพราะ `teleportTo` จะเพิ่มให้เอง
+            teleportTo(targetPosition)
         end)
         if not success then warn("Movement failed: ", err) end
     else
@@ -268,7 +158,6 @@ local function moveToPlayerObject(targetPlayer)
     end
 end
 
--- (ฟังก์ชัน updatePlayerList ไม่เปลี่ยนแปลง) ...
 local function updatePlayerList()
     if not playerListFrame or not playerListFrame.Parent then return end
 
@@ -312,6 +201,7 @@ end
 -- UI Creation Functions
 -- =============================================
 
+-- [MERGED & EDITED] Diamond Counter UI Creation (Moved to the Right)
 local function createDiamondCounterUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ItemCounterGui"
@@ -323,8 +213,8 @@ local function createDiamondCounterUI()
     shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
     shadowFrame.BackgroundTransparency = 0.6
     shadowFrame.BorderSizePixel = 0
-    shadowFrame.AnchorPoint = Vector2.new(1, 0)
-    shadowFrame.Position = UDim2.new(1, -15 + 3, 0, 15 + 3) 
+    shadowFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
+    shadowFrame.Position = UDim2.new(1, -15 + 3, 0, 15 + 3) -- Position from right edge
     shadowFrame.Size = UDim2.new(0, 220, 0, 60)
     shadowFrame.ZIndex = 1
     shadowFrame.Parent = screenGui
@@ -338,8 +228,8 @@ local function createDiamondCounterUI()
     mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
     mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
     mainFrame.BorderSizePixel = 1
-    mainFrame.AnchorPoint = Vector2.new(1, 0)
-    mainFrame.Position = UDim2.new(1, -15, 0, 15)
+    mainFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
+    mainFrame.Position = UDim2.new(1, -15, 0, 15) -- Position from right edge
     mainFrame.Size = UDim2.new(0, 220, 0, 60)
     mainFrame.ZIndex = 2
     mainFrame.Parent = screenGui
@@ -350,7 +240,7 @@ local function createDiamondCounterUI()
     
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "Title"
-    titleLabel.Text = Config.CounterAttributeName .. ":"
+    titleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
     titleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Font = Enum.Font.SourceSansBold
@@ -379,31 +269,37 @@ local function createDiamondCounterUI()
     return countLabel
 end
 
--- [แก้ไข] อัปเดตข้อความปุ่มใน UI
+-- Control Panel UI Creation (Responsive)
 local function createControlPanelUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
 
+    -- [MODIFIED] Increased height for the new button
     local frameHeight = 400
     
+    -- Main Draggable Frame
     ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame";
     ControlPanelFrame.Size = UDim2.new(0, 250, 0, frameHeight)
     ControlPanelFrame.Position = UDim2.new(0.5, 0, 0.5, 0);
-    ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); 
+    ControlPanelFrame.AnchorPoint = Vector2.new(0.5, 0.5); -- Center the frame
     ControlPanelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ControlPanelFrame.BorderSizePixel = 0; ControlPanelFrame.Active = true; ControlPanelFrame.Draggable = true; ControlPanelFrame.ClipsDescendants = true; ControlPanelFrame.Parent = ScreenGui
     local UICorner_Main = Instance.new("UICorner", ControlPanelFrame); UICorner_Main.CornerRadius = UDim.new(0, 8)
 
+    -- Title Bar
     local TitleBar = Instance.new("Frame"); TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 30); TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 60); TitleBar.BorderSizePixel = 0; TitleBar.Parent = ControlPanelFrame
     local UICorner_Title = Instance.new("UICorner", TitleBar); UICorner_Title.CornerRadius = UDim.new(0, 8)
     local TitleLabel = Instance.new("TextLabel"); TitleLabel.Parent = TitleBar; TitleLabel.Name = "TitleLabel"; TitleLabel.Size = UDim2.new(1, -40, 1, 0); TitleLabel.Position = UDim2.new(0, 10, 0, 0); TitleLabel.BackgroundTransparency = 1; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.Text = "Control Panel"; TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.TextSize = 18; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     local CollapseButton = Instance.new("TextButton"); CollapseButton.Parent = TitleBar; CollapseButton.Name = "CollapseButton"; CollapseButton.Size = UDim2.new(0, 20, 0, 20); CollapseButton.Position = UDim2.new(1, -25, 0.5, -10); CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 75); CollapseButton.Font = Enum.Font.SourceSansBold; CollapseButton.Text = "-"; CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CollapseButton.TextSize = 18
     local UICorner_Collapse = Instance.new("UICorner", CollapseButton); UICorner_Collapse.CornerRadius = UDim.new(0, 4)
 
+    -- Tab Container
     local TabContainer = Instance.new("Frame"); TabContainer.Name = "TabContainer"; TabContainer.Size = UDim2.new(1, 0, 0, 30); TabContainer.Position = UDim2.new(0, 0, 0, 30); TabContainer.BackgroundTransparency = 1; TabContainer.Parent = ControlPanelFrame
     local ControlsTabButton = Instance.new("TextButton"); ControlsTabButton.Name = "ControlsTabButton"; ControlsTabButton.Size = UDim2.new(0.5, 0, 1, 0); ControlsTabButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80); ControlsTabButton.Font = Enum.Font.SourceSansBold; ControlsTabButton.Text = "Controls"; ControlsTabButton.TextColor3 = Color3.fromRGB(255, 255, 255); ControlsTabButton.TextSize = 16; ControlsTabButton.Parent = TabContainer
     local PlayersTabButton = Instance.new("TextButton"); PlayersTabButton.Name = "PlayersTabButton"; PlayersTabButton.Size = UDim2.new(0.5, 0, 1, 0); PlayersTabButton.Position = UDim2.new(0.5, 0, 0, 0); PlayersTabButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50); PlayersTabButton.Font = Enum.Font.SourceSansBold; PlayersTabButton.Text = "Players"; PlayersTabButton.TextColor3 = Color3.fromRGB(200, 200, 200); PlayersTabButton.TextSize = 16; PlayersTabButton.Parent = TabContainer
 
+    -- Content Frames for Tabs
     local ContentContainer = Instance.new("Frame"); ContentContainer.Name = "ContentContainer"; ContentContainer.Size = UDim2.new(1, 0, 1, -60); ContentContainer.Position = UDim2.new(0, 0, 0, 60); ContentContainer.BackgroundTransparency = 1; ContentContainer.Parent = ControlPanelFrame
     
+    -- Controls Content
     local ControlsContentFrame = Instance.new("Frame"); ControlsContentFrame.Name = "ControlsContent"; ControlsContentFrame.Size = UDim2.new(1, 0, 1, 0); ControlsContentFrame.BackgroundTransparency = 1; ControlsContentFrame.Parent = ContentContainer; ControlsContentFrame.Visible = true
     local CoordinateLabel = Instance.new("TextLabel"); CoordinateLabel.Parent = ControlsContentFrame; CoordinateLabel.Name = "CoordinateLabel"; CoordinateLabel.Size = UDim2.new(1, -20, 0, 30); CoordinateLabel.Position = UDim2.new(0, 10, 0, 0); CoordinateLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 65); CoordinateLabel.Font = Enum.Font.SourceSansBold; CoordinateLabel.Text = "X: 0.0, Y: 0.0, Z: 0.0"; CoordinateLabel.TextColor3 = Color3.fromRGB(200, 200, 200); CoordinateLabel.TextSize = 16
     local UICorner_CoordLabel = Instance.new("UICorner", CoordinateLabel); UICorner_CoordLabel.CornerRadius = UDim.new(0, 6)
@@ -413,29 +309,30 @@ local function createControlPanelUI()
     local UICorner_GoBtn = Instance.new("UICorner", GoButton); UICorner_GoBtn.CornerRadius = UDim.new(0, 6)
     local FarmOreButton = Instance.new("TextButton"); FarmOreButton.Parent = ControlsContentFrame; FarmOreButton.Name = "FarmOreButton"; FarmOreButton.Size = UDim2.new(1, -20, 0, 30); FarmOreButton.Position = UDim2.new(0, 10, 0, 80); FarmOreButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40); FarmOreButton.Font = Enum.Font.SourceSansBold; FarmOreButton.Text = "Farm Ore (Z)"; FarmOreButton.TextColor3 = Color3.fromRGB(255, 255, 255); FarmOreButton.TextSize = 16
     local UICorner_FarmOreBtn = Instance.new("UICorner", FarmOreButton); UICorner_FarmOreBtn.CornerRadius = UDim.new(0, 6)
-    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "Buy Food (Alt)"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
+    local BuyFoodButton = Instance.new("TextButton"); BuyFoodButton.Name = "BuyFoodButton"; BuyFoodButton.Size = UDim2.new(1, -20, 0, 30); BuyFoodButton.Position = UDim2.new(0, 10, 0, 120); BuyFoodButton.BackgroundColor3 = Color3.fromRGB(255, 180, 0); BuyFoodButton.Font = Enum.Font.SourceSansBold; BuyFoodButton.Text = "Buy Food (H)"; BuyFoodButton.TextColor3 = Color3.fromRGB(255, 255, 255); BuyFoodButton.TextSize = 16; BuyFoodButton.Parent = ControlsContentFrame
     local UICorner_BuyFoodBtn = Instance.new("UICorner", BuyFoodButton); UICorner_BuyFoodBtn.CornerRadius = UDim.new(0, 6)
-    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "Sell Point (C)"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
+    local MoveToSellButton = Instance.new("TextButton"); MoveToSellButton.Name = "MoveToSellButton"; MoveToSellButton.Size = UDim2.new(1, -20, 0, 30); MoveToSellButton.Position = UDim2.new(0, 10, 0, 160); MoveToSellButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200); MoveToSellButton.Font = Enum.Font.SourceSansBold; MoveToSellButton.Text = "Sell Point (G)"; MoveToSellButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToSellButton.TextSize = 16; MoveToSellButton.Parent = ControlsContentFrame
     local UICorner_MoveSellBtn = Instance.new("UICorner", MoveToSellButton); UICorner_MoveSellBtn.CornerRadius = UDim.new(0, 6)
     local SellLoopButton = Instance.new("TextButton"); SellLoopButton.Name = "SellLoopButton"; SellLoopButton.Size = UDim2.new(1, -20, 0, 30); SellLoopButton.Position = UDim2.new(0, 10, 0, 200); SellLoopButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0); SellLoopButton.Font = Enum.Font.SourceSansBold; SellLoopButton.Text = "Loop Sell (V)"; SellLoopButton.TextColor3 = Color3.fromRGB(255, 255, 255); SellLoopButton.TextSize = 16; SellLoopButton.Parent = ControlsContentFrame
     local UICorner_SellLoopBtn = Instance.new("UICorner", SellLoopButton); UICorner_SellLoopBtn.CornerRadius = UDim.new(0, 6)
+
+    -- [NEW] Blue Label Button
     local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "Blue Label (B)"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
     local UICorner_BlueLabelBtn = Instance.new("UICorner", BlueLabelButton); UICorner_BlueLabelBtn.CornerRadius = UDim.new(0, 6)
 
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
-    local MoveToKealohaButton = Instance.new("TextButton"); MoveToKealohaButton.Name = "MoveToKealohaButton"; MoveToKealohaButton.Size = UDim2.new(1, -20, 0, 30); MoveToKealohaButton.Position = UDim2.new(0, 10, 0, 5); MoveToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); MoveToKealohaButton.Font = Enum.Font.SourceSansBold; MoveToKealohaButton.Text = "Find KealohaWeaver5712"; MoveToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); MoveToKealohaButton.TextSize = 16; MoveToKealohaButton.Parent = PlayersContentFrame
-    local UICorner_WarpKealohaBtn = Instance.new("UICorner", MoveToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
+    local WalkToKealohaButton = Instance.new("TextButton"); WalkToKealohaButton.Name = "WalkToKealohaButton"; WalkToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WalkToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WalkToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WalkToKealohaButton.Font = Enum.Font.SourceSansBold; WalkToKealohaButton.Text = "Find KealohaWeaver5712"; WalkToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToKealohaButton.TextSize = 16; WalkToKealohaButton.Parent = PlayersContentFrame
+    local UICorner_WarpKealohaBtn = Instance.new("UICorner", WalkToKealohaButton); UICorner_WarpKealohaBtn.CornerRadius = UDim.new(0, 6)
     playerListFrame = Instance.new("ScrollingFrame"); playerListFrame.Name = "PlayerListFrame"; playerListFrame.Parent = PlayersContentFrame; playerListFrame.Size = UDim2.new(1, -20, 1, -45); playerListFrame.Position = UDim2.new(0, 10, 0, 40); playerListFrame.BackgroundTransparency = 1; playerListFrame.BorderSizePixel = 0; playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0); playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 180); playerListFrame.ScrollBarThickness = 8
     local listLayout = Instance.new("UIListLayout"); listLayout.Parent = playerListFrame; listLayout.SortOrder = Enum.SortOrder.Name; listLayout.Padding = UDim.new(0, 5); listLayout.FillDirection = Enum.FillDirection.Vertical; listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-    -- [ใช้ Config] อัปเดตข้อความบนปุ่มเพื่อแสดงคีย์ลัด
-    FarmOreButton.Text = string.format("Farm Ore (%s)", Config.FarmOreKey.Name)
-    BuyFoodButton.Text = string.format("Buy Food (%s)", Config.BuyFoodKey.Name:gsub("Left", ""):gsub("Right", ""))
-    MoveToSellButton.Text = string.format("Sell Point (%s)", Config.SellPointKey.Name)
-    SellLoopButton.Text = string.format("Loop Sell (%s)", Config.SellLoopKey.Name)
-    BlueLabelButton.Text = string.format("Blue Label (%s)", Config.BlueLabelKey.Name:gsub("Left", ""):gsub("Right", "")) -- [แก้ไข] อัปเดตข้อความปุ่ม
-    MoveToKealohaButton.Name = "MoveToKealohaButton" -- อัปเดตชื่อปุ่ม (จาก WalkToKealohaButton)
+    -- [ปรับปรุง] อัปเดตข้อความบนปุ่มเพื่อแสดงคีย์ลัด
+    FarmOreButton.Text = "Farm Ore (Z)"
+    BuyFoodButton.Text = "Buy Food (H)"
+    MoveToSellButton.Text = "Sell Point (G)"
+    SellLoopButton.Text = "Loop Sell (V)"
+    BlueLabelButton.Text = "Blue Label (B)"
 
     return {
         ScreenGui = ScreenGui,
@@ -447,13 +344,13 @@ local function createControlPanelUI()
         BuyFoodButton = BuyFoodButton,
         MoveToSellButton = MoveToSellButton,
         SellLoopButton = SellLoopButton,
-        BlueLabelButton = BlueLabelButton,
-        MoveToKealohaButton = MoveToKealohaButton, -- อัปเดตชื่อที่ส่งคืน
+        BlueLabelButton = BlueLabelButton, -- Added new button here
+        WalkToKealohaButton = WalkToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
         ControlsContentFrame = ControlsContentFrame,
         PlayersContentFrame = PlayersContentFrame,
-        ControlPanelFrame = ControlPanelFrame
+        ControlPanelFrame = ControlPanelFrame -- Return the main frame for resizing
     }
 end
 
@@ -462,17 +359,23 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 400)
+local originalSize = UDim2.new(0, 250, 0, 400) -- Updated size
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local inventoryConnection = nil
 local isWaitingForRockToClear = false
 local lastPosition = Vector3.new()
 local timeStationary = 0
+local antiStuckThreshold = 5
 local currentTargetOre = nil
 local timeAtOreStationary = 0
-local isSellLoopActive = false 
-local isMining = false -- [ใหม่] เพิ่มตัวแปรสถานะเพื่อป้องกันการยิงอีเวนต์ซ้ำ
+local antiStuckAtOreThreshold = 10 
+local distanceToOreThreshold = 3
+local isSellLoopActive = false -- State for the new sell loop
+local pickaxeCheckTimer = 0 -- [NEW] Timer for pickaxe check
+-- [NEW] นำตัวแปร Stamina กลับมา
+local lastStaminaValue = -1 
+local staminaCheckTimer = 0 
 
 -- Logic for Diamond Counter
 local function setupDiamondCounter(countLabel)
@@ -482,14 +385,14 @@ local function setupDiamondCounter(countLabel)
     end
 
     local function updateAttributeCount()
-        local amount = inventoryFolder:GetAttribute(Config.CounterAttributeName) or 0
+        local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
         countLabel.Text = tostring(amount)
     end
 
     updateAttributeCount() -- Initial update
 
     inventoryFolder.AttributeChanged:Connect(function(attributeName)
-        if attributeName == Config.CounterAttributeName then
+        if attributeName == DIAMOND_ATTRIBUTE_NAME then
             updateAttributeCount()
         end
     end)
@@ -519,6 +422,73 @@ local function getObjectsToTrack()
     end
     
     return trackList
+end
+
+-- ===================================================================
+-- [NEW] Pathfinding function to walk to a specific coordinate
+-- This function calculates a path and moves the character along it.
+-- ===================================================================
+local function walkToPosition(destinationPosition)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+    if not (humanoid and rootPart and humanoid.Health > 0) then return end
+
+    print("Walking to position:", destinationPosition, ". Calculating path...")
+
+    local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+    local path = PathfindingService:CreatePath(agentParameters)
+
+    local success, errorMessage = pcall(function()
+        path:ComputeAsync(rootPart.Position, destinationPosition)
+    end)
+
+    if success and path.Status == Enum.PathStatus.Success then
+        print("Path calculated. Following waypoints...")
+        local waypoints = path:GetWaypoints()
+
+        local pathBlockedConnection
+        local function onPathBlocked(blockedWaypointIndex)
+             if blockedWaypointIndex < #waypoints and isWaitingForRockToClear then
+                 print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculating...")
+                 if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                 walkToPosition(destinationPosition) -- Recalculate and retry
+             end
+        end
+        pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+
+        for _, waypoint in ipairs(waypoints) do
+            -- Check if the process was cancelled (e.g., player manually stopped farming)
+            if not isWaitingForRockToClear and not isOreFarmLoopActive then
+                print("Process was cancelled mid-path. Aborting walk.")
+                break
+            end
+            humanoid:MoveTo(waypoint.Position)
+
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+
+            -- [REMOVED] ลบการกด Shift ที่ทำให้เกิดปัญหา
+            -- pcall(function()
+            --     local VirtualInputManager = game:GetService("VirtualInputManager")
+            --     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+            --     task.wait(0.05) -- Very short press for a toggle
+            --     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+            -- end)
+
+            humanoid.MoveToFinished:Wait()
+        end
+
+        if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+        print("Reached destination or path ended.")
+    else
+        warn("Pathfinding to position failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
+        humanoid:MoveTo(destinationPosition)
+        humanoid.MoveToFinished:Wait() -- Also wait for direct move
+    end
 end
 
 
@@ -552,29 +522,66 @@ local function findAndWalkToClosestOre(oreToExclude)
 
     if closestObject then
         currentTargetOre = closestObject
-        print("Walking to closest object:", closestObject:GetFullName())
+        print("Walking to closest object:", closestObject:GetFullName(), ". Calculating path...")
         
-        walkToPosition(closestObject.WorldPivot.Position, function()
-            -- ฟังก์ชัน onCancelled: คืนค่า true ถ้ายังฟาร์มอยู่, false ถ้ายกเลิก
-            return isOreFarmLoopActive
+        local agentParameters = { AgentRadius = 3, AgentHeight = 6, AgentCanJump = true }
+        local path = PathfindingService:CreatePath(agentParameters)
+        
+        local success, errorMessage = pcall(function()
+            path:ComputeAsync(rootPart.Position, closestObject.WorldPivot.Position)
         end)
-        
-        isMining = false -- [ใหม่] รีเซ็ตสถานะการขุด เมื่อหาแร่ใหม่
-        
+
+        if success and path.Status == Enum.PathStatus.Success then
+            print("Path calculated. Following waypoints...")
+            local waypoints = path:GetWaypoints()
+            
+            local pathBlockedConnection
+            local function onPathBlocked(blockedWaypointIndex)
+                if blockedWaypointIndex < #waypoints then
+                    print("Path blocked at waypoint " .. blockedWaypointIndex .. ". Recalculcating...") -- [FIXED]
+                    if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+                    findAndWalkToClosestOre(nil)
+                end
+            end
+            pathBlockedConnection = path.Blocked:Connect(onPathBlocked)
+
+            for i, waypoint in ipairs(waypoints) do
+                if not isOreFarmLoopActive then
+                    print("Farming stopped mid-path. Aborting walk.")
+                    break
+                end
+                humanoid:MoveTo(waypoint.Position)
+
+                -- [REMOVED] ลบการกด Shift ที่ทำให้เกิดปัญหา
+                -- pcall(function()
+                --     local VirtualInputManager = game:GetService("VirtualInputManager")
+                --     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+                --     task.wait(0.05) -- Very short press for a toggle
+                --     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+                -- end)
+
+                humanoid.MoveToFinished:Wait()
+            end
+            
+            if pathBlockedConnection then pathBlockedConnection:Disconnect() end
+            print("Reached destination or path ended.")
+        else
+            warn("Pathfinding to ore failed: ", errorMessage or "No viable path.", "Using direct walk instead.")
+            humanoid:MoveTo(closestObject.WorldPivot.Position)
+        end
     else
         currentTargetOre = nil
         warn("Could not find any valid objects to walk to (excluding current target).")
     end
 end
 
--- [แก้ไข] Move to Coords (ใช้ 'teleport' ตามที่ขอ)
+-- [MODIFIED] Move to Coords using teleport movement
 local function moveToCoords(inputBox)
     local parts = inputBox.Text:split(",")
     if #parts == 3 then
         local x, y, z = tonumber(parts[1]), tonumber(parts[2]), tonumber(parts[3])
         if x and y and z then
-            -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-            instantTeleportTo(Vector3.new(x, y, z))
+            teleportTo(Vector3.new(x, y, z))
             inputBox.Text = ""
         else
             inputBox.Text = "Error: Invalid Format"
@@ -584,10 +591,14 @@ local function moveToCoords(inputBox)
     end
 end
 
+-- Farming coordinates
+local initialFarmPosition = Vector3.new(-296, 12, -2489)
+local postProcessFarmPosition = Vector3.new(-296, 12, -2489)
+
 -- Farm Step for auto-resume
 local function executeResumeFarmStep()
     if not isOreFarmLoopActive then return end
-    instantTeleportTo(Config.FarmInitialPosition)
+    teleportTo(postProcessFarmPosition) -- Use teleport to get back to the general area
     task.wait(1) -- Wait for teleport to settle
     findAndWalkToClosestOre(nil) -- Then start walking to the nearest ore
 end
@@ -598,24 +609,25 @@ local function onInventoryChanged(attributeName, farmButton)
     
     local rockCount = inventoryFolder:GetAttribute("Rock") or 0
 
-    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= Config.FarmFullAmount then
+    if isOreFarmLoopActive and not isWaitingForRockToClear and rockCount >= 100 then
         isWaitingForRockToClear = true
         isOreFarmLoopActive = false -- Pause farming
 
         farmButton.Text = "Walking to Process..."
         farmButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
-        print("Rock count reached 100. Walking to process point with a " .. Config.ProcessWalkTimeout .. "-second timeout.")
+        print("Rock count reached 100. Walking to process point with a 10-second timeout.")
         task.wait(1)
 
+        -- [[[[[ ใหม่: ตรรกะการจับเวลาสำหรับการเดินไปแปรรูป ]]]]]
         local walkCompleted = false
         local walkCancelled = false
 
+        -- Coroutine สำหรับการเดิน เพื่อไม่ให้เทรดหลักค้าง
         task.spawn(function()
-            -- [ยังคงใช้ Walk] เพราะนี่คือระยะใกล้ (จุดแปรรูปอยู่ในฟาร์ม)
-            walkToPosition(Config.FarmProcessPosition, function()
-                return isWaitingForRockToClear
-            end) 
+            -- สิ่งนี้จะทำงานอยู่เบื้องหลัง
+            walkToPosition(postProcessFarmPosition) 
+            -- ตรวจสอบว่าไม่ได้ถูกยกเลิกในระหว่างการเดิน
             if isWaitingForRockToClear then 
                 walkCompleted = true
             else
@@ -623,8 +635,10 @@ local function onInventoryChanged(attributeName, farmButton)
             end
         end)
 
+        -- ลูปสำหรับจับเวลาและตรวจสอบสถานะ
         local timeWaited = 0
-        while not walkCompleted and timeWaited < Config.ProcessWalkTimeout do
+        while not walkCompleted and timeWaited < 10 do
+            -- ตรวจสอบการยกเลิกด้วยตนเองจาก UI
             if not isWaitingForRockToClear then 
                 walkCancelled = true
                 break
@@ -632,35 +646,35 @@ local function onInventoryChanged(attributeName, farmButton)
             task.wait(0.1)
             timeWaited = timeWaited + 0.1
         end
+        -- [[[[[ จบ: ตรรกะการจับเวลา ]]]]]
         
+        -- ถ้าถูกยกเลิกโดยผู้ใช้
         if walkCancelled then
             print("Walk to process was cancelled by the user.")
-            return
+            return -- ออกจากฟังก์ชัน สถานะ UI จะถูกจัดการที่อื่น
         end
 
+        -- ถ้าลูปจบลงเพราะหมดเวลา ให้เทเลพอร์ต
         if not walkCompleted then
-            print("Walk to process point timed out. Teleporting to destination...")
-            instantTeleportTo(Config.FarmProcessPosition)
-            task.wait(1) 
+            print("Walk to process point timed out (>10s). Teleporting to destination...")
+            teleportTo(postProcessFarmPosition)
+            task.wait(1) -- รอสักครู่เพื่อให้การเทเลพอร์ตเสร็จสิ้น
         else
-            print("Walk to process point completed successfully.")
+            print("Walk to process point completed successfully within the time limit.")
         end
 
+        -- ตอนนี้ ไม่ว่าจะมาถึงด้วยวิธีใด (เดิน, หมดเวลา+เทเลพอร์ต) เราจะทำการแปรรูปแร่
         if isWaitingForRockToClear then
             print("Character is at the processing point. Sending 'Process' command to server...")
-            local success, err = pcall(function()
-                NetworkEvent:FireServer("fire", nil, "Process", "Rock")
-            end)
-            if not success then
-                warn("Failed to send 'Process' event: ", err)
-            end
+            NetworkEvent:FireServer("fire", nil, "Process", "Rock")
         else
+            -- กรณีนี้ควรถูกดักจับโดย walkCancelled แต่นี่เป็นการป้องกันไว้ก่อน
             print("Walk was cancelled just before processing. Not sending 'Process' command.")
         end
 
     elseif isWaitingForRockToClear and rockCount == 0 then
-        print("Rock inventory cleared. Waiting " .. Config.ProcessWaitTime .. " seconds before resuming farming...")
-        task.wait(Config.ProcessWaitTime)
+        print("Rock inventory cleared. Waiting 5 seconds before resuming farming...")
+        task.wait(5)
 
         if not isWaitingForRockToClear then
             print("Farming was cancelled during the wait. Aborting resume.")
@@ -692,8 +706,8 @@ local function toggleOreFarmLoop(farmButton)
         if currentRootPart then
             lastPosition = currentRootPart.Position
             print("Starting farm manually. Teleporting to initial position...")
-            instantTeleportTo(Config.FarmInitialPosition)
-            task.wait(1) 
+            teleportTo(initialFarmPosition) -- [MODIFIED]
+            task.wait(1) -- Wait for teleport to settle
             findAndWalkToClosestOre(nil)
         end
         timeStationary = 0
@@ -709,106 +723,101 @@ local function toggleOreFarmLoop(farmButton)
             onInventoryChanged("Rock", farmButton)
         end)
         
-        isMining = false -- [ใหม่] รีเซ็ตสถานะ
-        
     else
         isWaitingForRockToClear = false
-        farmButton.Text = string.format("Farm Ore (%s)", Config.FarmOreKey.Name)
+        farmButton.Text = "Farm Ore (Z)"
         farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         
         if inventoryConnection then
             inventoryConnection:Disconnect()
             inventoryConnection = nil
         end
-        
-        isMining = false -- [ใหม่] รีเซ็ตสถานะ
     end
 end
 
 -- ===================================================================
--- [ปรับปรุง] Toggle Sell Loop (ไม่เปลี่ยนแปลง)
+-- [[[[[ บล็อคที่แก้ไข ]]]]]
+-- [MODIFIED] Toggle Sell Loop (ตรวจสอบ Attributes ในกระเป๋า)
 -- ===================================================================
 local function toggleSellLoop(button)
     isSellLoopActive = not isSellLoopActive
 
     if isSellLoopActive then
         button.Text = "Stop Selling"
-        button.BackgroundColor3 = Color3.fromRGB(200, 40, 40) 
+        button.BackgroundColor3 = Color3.fromRGB(200, 40, 40) -- Red color for "Stop"
 
         task.spawn(function()
             print("Sell loop started.")
             
+            -- [NEW] รายการไอเท็มที่จะขายจาก inventory attributes
+            local itemsToSell = {"Rockfragments", "Soil", "Iron", "Copper", "Gold"}
+
             while isSellLoopActive do
                 if not NetworkEvent then
                     warn("Sell Loop: NetworkEvent is not available.")
-                    isSellLoopActive = false
+                    isSellLoopActive = false -- Stop the loop
                     break
                 end
                 
                 if not inventoryFolder then
                     warn("Sell Loop: inventoryFolder is not found.")
-                    isSellLoopActive = false
+                    isSellLoopActive = false -- Stop the loop
                     break
                 end
 
-                for _, itemName in ipairs(Config.ItemsToSell) do
-                    if not isSellLoopActive then break end 
+                -- [NEW] วนลูปแต่ละไอเท็มและขายทั้งหมด
+                for _, itemName in ipairs(itemsToSell) do
+                    if not isSellLoopActive then break end -- ตรวจสอบอีกครั้ง เผื่อถูกสั่งหยุดกลางคัน
                     
                     local quantity = inventoryFolder:GetAttribute(itemName)
                     
+                    -- ตรวจสอบว่ามีไอเท็มอยู่จริง (เป็นตัวเลข และมากกว่า 0)
                     if quantity and type(quantity) == "number" and quantity > 0 then
-                        local success, err = pcall(function()
+                        pcall(function()
                             print("Selling " .. tostring(quantity) .. " of " .. itemName)
                             NetworkEvent:FireServer("fire", nil, "Economy", itemName, quantity)
                         end)
-                        if not success then
-                            warn("Failed to sell " .. itemName .. ": ", err)
-                        end
-                        task.wait(0.1) 
+                        task.wait(0.1) -- หน่วงเวลาเล็กน้อยระหว่างการขายแต่ละรายการ
                     end
                 end
                 
-                task.wait(0.5) 
+                task.wait(0.5) -- รอ 0.5 วินาที ก่อนที่จะเริ่มวนลูปขายใหม่ทั้งหมด
             end
             
+            -- This part runs after the loop ends
             if button and button.Parent then
-                button.Text = string.format("Loop Sell (%s)", Config.SellLoopKey.Name)
+                button.Text = "Loop Sell (V)"
                 button.BackgroundColor3 = Color3.fromRGB(200, 100, 0) -- Original color
             end
             print("Sell loop stopped.")
         end)
     else
-        -- The loop will stop on its own
+        -- The loop will stop on its own when isSellLoopActive becomes false
     end
 end
+-- ===================================================================
+-- [[[[[ จบ บล็อคที่แก้ไข ]]]]]
+-- ===================================================================
 
--- ===================================================================
--- [แก้ไข] Buy/Sell/Walk Functions (เปลี่ยนเป็น Teleport)
--- ===================================================================
+
+-- Buy/Sell/Walk Functions
 local function buyFood()
     if not NetworkEvent then warn("NetworkEvent not available for buyFood") return end
-    
-    print("Teleporting to food shop...")
-    -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-    instantTeleportTo(Config.FoodShopPosition)
-    task.wait(1) -- รอให้เทเลพอร์ตเสร็จ
-    
-    print("At food shop. Buying food...")
-    pcall(function()
-        NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
-        task.wait(0.2)
-        NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
-    end)
+    teleportTo(Vector3.new(3000, 16, 2280)) -- [MODIFIED]
+    task.wait(1)
+    NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
+    task.wait(0.2)
+    NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 end
 
 local function moveToSellPoint()
-    print("Teleporting to sell point...")
-    -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-    instantTeleportTo(Config.SellPointPosition + Vector3.new(0, 3, 0))
+    local destination = Vector3.new(2853.1, 14.5, 2108.9)
+    print("Moving to sell point...")
+    -- [REMOVED] ลบ offset เดิม (Vector3.new(0, 3, 0)) ออก เพราะ `teleportTo` จะเพิ่มให้เอง
+    teleportTo(destination)
 end
 
--- [แก้ไข] เปลี่ยนชื่อฟังก์ชันจาก walkToKealoha เป็น moveToKealoha
-local function moveToKealoha()
+local function walkToKealoha()
     local targetPlayerName = "KealohaWeaver5712"
     local targetPlayer = Players:FindFirstChild(targetPlayerName)
     
@@ -831,49 +840,45 @@ local function moveToKealoha()
             return
         end
         
-        print("Teleporting to player: " .. targetPlayer.Name)
-        -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-        instantTeleportTo(targetPosition)
+        print("Walking to player: " .. targetPlayer.Name)
+        walkToPosition(targetPosition)
     else
         warn("Could not find character object for player: " .. targetPlayer.Name)
     end
 end
 
--- [แก้ไข] Death Recovery Function (ใช้ teleport)
+-- ===================================================================
+-- [[[[[ บล็อคที่แก้ไข ]]]]]
+-- [NEW] Death Recovery Function (แก้ไขตามคำขอ)
+-- ฟังก์ชันนี้จะทำงานเมื่อตัวละครตาย
+-- ===================================================================
 local function handleDeathAndRecover()
     task.spawn(function()
-        if not isOreFarmLoopActive then
-            print("Player died, but farm was not active. No recovery action needed.")
-            return
-        end
-
-        print("DEATH DETECTED! Starting recovery sequence...")
-        toggleOreFarmLoop(UIElements.FarmOreButton)
+        print("DEATH DETECTED! Starting new death sequence.")
         
-        task.wait(3)
+        -- 1. วาปไปยังพิกัด 0, -200, 0
+        print("Moving to death point (0, -200, 0)...")
+        teleportTo(Vector3.new(0, -200, 0))
 
-        print("Teleporting to recovery point...")
-        -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-        instantTeleportTo(Config.DeathRecoveryPosition)
+        -- 2. รอ 5 วินาที
+        print("Waiting for 5 seconds...")
+        task.wait(5)
 
-        task.wait(3)
-
-        print("Performing post-recovery key press (1 + Shift)...")
+        -- 3. ทำการออกจากเกม
+        print("Exiting game.")
         pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-            task.wait(0.5)
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
-            print("Post-recovery key press completed.")
+            -- LocalPlayer ถูกกำหนดไว้ที่ด้านบนของสคริปต์
+            if LocalPlayer then
+                LocalPlayer:Kick("คุณเสียชีวิต")
+            else
+                warn("Could not kick player: LocalPlayer not found.")
+            end
         end)
-
-        print("Recovery complete. Auto-restarting farm loop...")
-        toggleOreFarmLoop(UIElements.FarmOreButton)
     end)
 end
+-- ===================================================================
+-- [[[[[ จบ บล็อคที่แก้ไข ]]]]]
+-- ===================================================================
 
 -- =============================================
 -- Main Execution & Event Connections
@@ -884,17 +889,14 @@ diamondCountLabel = createDiamondCounterUI()
 
 -- Setup Logic
 setupDiamondCounter(diamondCountLabel)
-originalSize = UIElements.ControlPanelFrame.Size 
+originalSize = UIElements.ControlPanelFrame.Size -- Update original size from created UI
 
 -- Connect Death Handler
 local humanoid = Character:WaitForChild("Humanoid")
 humanoid.Died:Connect(handleDeathAndRecover)
 print("Death recovery system connected for initial character.")
 
--- =============================================
--- [ปรับปรุง] Update Loop (RenderStepped)
--- [ผสาน] เพิ่มตรรกะการขุดแร่
--- =============================================
+-- Update Loop
 RunService.RenderStepped:Connect(function(deltaTime)
     if HumanoidRootPart and not isCollapsed then
         local pos = HumanoidRootPart.Position
@@ -905,13 +907,44 @@ RunService.RenderStepped:Connect(function(deltaTime)
     local currentPos = LocalPlayer.Character.HumanoidRootPart.Position
     local isStationary = (currentPos - lastPosition).Magnitude < 0.5
 
-    if currentTargetOre and not currentTargetOre.Parent then
-        print("Target ore was mined. Finding next ore immediately.")
-        currentTargetOre = nil
-        timeAtOreStationary = 0
-        timeStationary = 0
-        findAndWalkToClosestOre(nil)
-        return
+    -- [NEW] Pickaxe Check Loop (every 1 second)
+    pickaxeCheckTimer = pickaxeCheckTimer + deltaTime
+    if pickaxeCheckTimer >= 1 then
+        pickaxeCheckTimer = 0 -- Reset timer
+        
+        -- Find the player's model inside Workspace.Character, as implied by user and other parts of the script
+        local characterFolder = Workspace:FindFirstChild("Character")
+        local playerModel = characterFolder and characterFolder:FindFirstChild(LocalPlayer.Name)
+
+        if playerModel then
+            local pickaxe = playerModel:FindFirstChild("Pickaxe")
+            if not pickaxe then
+                print("Pickaxe not equipped. Pressing '1' to equip.")
+                pcall(function()
+                    local VirtualInputManager = game:GetService("VirtualInputManager")
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                end)
+            end
+        else
+            -- Fallback check using the standard Character property if not found in Workspace.Character
+            local char = LocalPlayer.Character
+            if char then
+                 local pickaxe = char:FindFirstChild("Pickaxe")
+                 if not pickaxe then
+                    print("Pickaxe not equipped (fallback check). Pressing '1' to equip.")
+                    pcall(function()
+                        local VirtualInputManager = game:GetService("VirtualInputManager")
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                    end)
+                 end
+            else
+                warn("Pickaxe check: Could not find player model.")
+            end
+        end
     end
 
     -- General Anti-Stuck Logic
@@ -922,44 +955,59 @@ RunService.RenderStepped:Connect(function(deltaTime)
         lastPosition = currentPos
     end
     
-    if timeStationary >= Config.GeneralStuckTime then
+    if timeStationary >= antiStuckThreshold then
         print("Anti-Stuck Triggered (General). Re-pathing...")
         findAndWalkToClosestOre(nil)
         timeStationary = 0
         timeAtOreStationary = 0
     end
 
+    -- [NEW] นำระบบ Stamina Check กลับมาและแก้ไข
+    staminaCheckTimer = staminaCheckTimer + deltaTime
+    if staminaCheckTimer >= 2 then
+        staminaCheckTimer = 0 -- Reset timer
+        
+        -- Only check if the character is supposed to be moving (not stationary)
+        if not isStationary and statusFolder then
+            local currentStamina = statusFolder:GetAttribute("Stamina")
+            if currentStamina then
+                
+                -- [FIXED] แก้ไขตรรกะ:
+                -- 1. ตรวจสอบว่า lastStaminaValue ไม่ใช่ -1 (ไม่ใช่การรันครั้งแรก)
+                if lastStaminaValue ~= -1 then
+                    -- 2. ถ้าค่า Stamina "ไม่ลดลง" (แสดงว่ากำลังเดิน) ให้กด Shift 1 ครั้ง
+                    if currentStamina >= lastStaminaValue and currentStamina > 10 then 
+                        print("Stamina not decreasing while moving. Simulating Shift toggle.")
+                        pcall(function()
+                            local VirtualInputManager = game:GetService("VirtualInputManager")
+                            -- [FIXED] Just toggle (press/release), don't hold
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
+                            task.wait(0.05) 
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
+                        end)
+                    end
+                end
+                
+                -- 3. อัปเดตค่า lastStaminaValue "ทุกครั้ง" หลังการตรวจสอบ
+                lastStaminaValue = currentStamina
+            else
+                -- Reset if stamina attribute is lost
+                lastStaminaValue = -1
+            end
+        else
+            -- Reset if stationary or no status folder
+            lastStaminaValue = -1
+        end
+    end
+
     -- Ore-specific Anti-Stuck Logic
     if currentTargetOre and currentTargetOre.Parent then
         local distToTarget = (currentPos - currentTargetOre.WorldPivot.Position).Magnitude
 
-        if isStationary and distToTarget <= Config.AtOreDistanceThreshold then
-            
-            -- [[[[[ บล็อคที่ผสาน ]]]]]
-            if timeAtOreStationary == 0 and not isMining then
-                isMining = true
-                print("Arrived at ore: " .. currentTargetOre.Name .. ". Firing 'farm-event'.")
-                
-                local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    local args = {
-                        "invoke",
-                        "1761427902372148",
-                        "farm-event",
-                        humanoid,
-                        nil -- ส่ง nil แทนที่ hardcoded path
-                    }
-                    
-                    pcall(function()
-                        NetworkEvent:FireServer(unpack(args))
-                    end)
-                end
-            end
-            -- [[[[[ จบ บล็อคที่ผสาน ]]]]]
-            
+        if isStationary and distToTarget <= distanceToOreThreshold then
             timeAtOreStationary += deltaTime
             
-            if timeAtOreStationary >= Config.AtOreStuckTime then
+            if timeAtOreStationary >= antiStuckAtOreThreshold then
                 print("Anti-Stuck Triggered (at Ore). Finding next closest ore...")
                 findAndWalkToClosestOre(currentTargetOre)
                 timeStationary = 0
@@ -970,7 +1018,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
         end
     else
         timeAtOreStationary = 0
-        isMining = false
     end
 end)
 
@@ -1003,94 +1050,103 @@ UIElements.CollapseButton.MouseButton1Click:Connect(toggleCollapse)
 UIElements.ControlsTabButton.MouseButton1Click:Connect(function() switchTab("Controls") end)
 UIElements.PlayersTabButton.MouseButton1Click:Connect(function() 
     switchTab("Players")
-    updatePlayerList()
+    updatePlayerList() -- Update player list when tab is clicked
 end)
 UIElements.GoButton.MouseButton1Click:Connect(function() moveToCoords(UIElements.InputBox) end)
 UIElements.FarmOreButton.MouseButton1Click:Connect(function() toggleOreFarmLoop(UIElements.FarmOreButton) end)
 UIElements.BuyFoodButton.MouseButton1Click:Connect(buyFood)
 UIElements.MoveToSellButton.MouseButton1Click:Connect(moveToSellPoint)
-UIElements.MoveToKealohaButton.MouseButton1Click:Connect(moveToKealoha) -- [แก้ไข] เชื่อมต่อฟังก์ชันที่เปลี่ยนชื่อ
+UIElements.WalkToKealohaButton.MouseButton1Click:Connect(walkToKealoha)
 UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UIElements.SellLoopButton) end)
-
--- [แก้ไข] เปลี่ยนเป็น Teleport
+-- [NEW] Connect the blue label button
 UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
-    print("Teleporting to Blue Label location...")
-    instantTeleportTo(Config.BlueLabelPosition)
+    print("Moving to Blue Label location...")
+    teleportTo(Vector3.new(1936, 15, 2285))
 end)
 
--- พับ UI ตอนเริ่มต้น
+-- [[[[[ บล็อคใหม่ ]]]]]
+-- พับ UI ตอนเริ่มต้นเกมตามที่ผู้ใช้ร้องขอ
 print("Collapsing UI on start...")
 toggleCollapse() 
+-- [[[[[ จบ ]]]]]
+
 
 -- =============================================
--- [แก้ไข] Hotkeys (ใช้ Teleport)
+-- [[[[[ บล็อคที่แก้ไข ]]]]]
+-- เพิ่มคีย์ลัดตามที่ผู้ใช้ร้องขอ
 -- =============================================
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent then return end
 
-    if input.KeyCode == Config.ToggleUIKey then
+    if input.KeyCode == Enum.KeyCode.T then
         UIElements.ScreenGui.Enabled = not UIElements.ScreenGui.Enabled
         
-    elseif input.KeyCode == Config.FarmOreKey then
-        print("Key " .. Config.FarmOreKey.Name .. " pressed: Toggling Farm Ore")
+    -- [NEW] Hotkeys for buttons
+    elseif input.KeyCode == Enum.KeyCode.Z then
+        print("Key Z pressed: Toggling Farm Ore")
         toggleOreFarmLoop(UIElements.FarmOreButton)
         
-    elseif input.KeyCode == Config.BuyFoodKey then -- [แก้ไข] ลบ or RightAlt ออก
-        print("Key " .. Config.BuyFoodKey.Name .. " pressed: Buying Food") -- [แก้ไข] อัปเดตข้อความ
+    elseif input.KeyCode == Enum.KeyCode.H then
+        print("Key H pressed: Buying Food")
         buyFood()
         
-    elseif input.KeyCode == Config.SellPointKey then
-        print("Key " .. Config.SellPointKey.Name .. " pressed: Moving to Sell Point")
+    elseif input.KeyCode == Enum.KeyCode.G then
+        print("Key G pressed: Moving to Sell Point")
         moveToSellPoint()
         
-    elseif input.KeyCode == Config.SellLoopKey then
-        print("Key " .. Config.SellLoopKey.Name .. " pressed: Toggling Sell Loop")
+    elseif input.KeyCode == Enum.KeyCode.V then
+        print("Key V pressed: Toggling Sell Loop")
         toggleSellLoop(UIElements.SellLoopButton)
         
-    elseif input.KeyCode == Config.BlueLabelKey then -- [แก้ไข]
-        print("Key " .. Config.BlueLabelKey.Name .. " pressed: Teleporting to Blue Label")
-        instantTeleportTo(Config.BlueLabelPosition)
+    elseif input.KeyCode == Enum.KeyCode.B then
+        print("Key B pressed: Moving to Blue Label")
+        teleportTo(Vector3.new(1936, 15, 2285))
         
     end
 end)
 
 
 --[[
-    [ปรับปรุง] ระบบกินอาหาร/น้ำดื่มอัตโนมัติ (ไม่เปลี่ยนแปลง)
+    [อัปเดต] ระบบกินอาหาร/น้ำดื่มอัตโนมัติโดยใช้ Attributes
+    ลูปนี้จะคอยตรวจสอบค่าสถานะ Attributes ของผู้เล่น และจะใช้ไอเทมก็ต่อเมื่อจำเป็นเท่านั้น
 ]]
 task.spawn(function()
     if not NetworkEvent then
         warn("NetworkEvent not found for Smart Auto-Eat loop.")
         return
     end
-    if not statusFolder then
-        warn("statusFolder not found for Smart Auto-Eat loop.")
-        return
-    end
 
-    while task.wait(Config.AutoEatCheckInterval) do 
-        local hungerValue = statusFolder:GetAttribute("Hunger")
-        if hungerValue and hungerValue <= Config.AutoEatThreshold then
-            print("Hunger is low (" .. string.format("%.2f", hungerValue) .. "), eating bread.")
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Use Item", "Bread") end)
-            task.wait(2) 
-        end
+    while task.wait(5) do -- ตรวจสอบทุกๆ 5 วินาที
+        local statusFolder = LocalPlayer:FindFirstChild("Status")
+        if statusFolder then
+            -- ตรวจสอบค่าความหิว (Hunger) จาก Attribute
+            local hungerValue = statusFolder:GetAttribute("Hunger")
+            if hungerValue and hungerValue <= 70 then
+                print("Hunger is low (" .. string.format("%.2f", hungerValue) .. "), eating bread.")
+                NetworkEvent:FireServer("fire", nil, "Use Item", "Bread")
+                task.wait(2) -- หน่วงเวลาเล็กน้อยหลังกิน
+            end
 
-        local thirstyValue = statusFolder:GetAttribute("Thirsty")
-        if thirstyValue and thirstyValue <= Config.AutoEatThreshold then
-            print("Thirsty is low (" .. string.format("%.2f", thirstyValue) .. "), drinking water.")
-            pcall(function() NetworkEvent:FireServer("fire", nil, "Use Item", "Water") end)
-            task.wait(2) 
+            -- ตรวจสอบค่าความกระหาย (Thirsty) จาก Attribute
+            local thirstyValue = statusFolder:GetAttribute("Thirsty")
+            if thirstyValue and thirstyValue <= 70 then
+                print("Thirsty is low (" .. string.format("%.2f", thirstyValue) .. "), drinking water.")
+                NetworkEvent:FireServer("fire", nil, "Use Item", "Water")
+                task.wait(2) -- หน่วงเวลาเล็กน้อยหลังดื่ม
+            end
         end
     end
 end)
 
 
--- Anti-AFK Loop (ไม่เปลี่ยนแปลง)
+-- Anti-AFK Loop to prevent being kicked for inactivity
 task.spawn(function()
     task.wait(60)
-    while task.wait(Config.AntiAFKInterval) do 
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    while true do
+        task.wait(240) -- Every 4 minutes
         pcall(function()
+            -- Simulate pressing Spacebar
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
             task.wait(0.1)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
@@ -1101,10 +1157,14 @@ task.spawn(function()
 end)
 
 -- ====================================================================================
--- [แก้ไข] ลูปตรวจสอบตำแหน่งฟาร์ม (ใช้ Teleport)
+-- [[[[[ บล็อคใหม่ ]]]]]
+-- ลูปตรวจสอบตำแหน่งฟาร์ม
+-- ลูปนี้จะตรวจสอบทุก 1 นาที ว่าผู้เล่นอยู่ไกลจากจุดฟาร์มเกินไปหรือไม่
+-- ในขณะที่เปิดใช้งานการฟาร์มอยู่
 -- ====================================================================================
 task.spawn(function()
-    while task.wait(Config.FarmAreaCheckInterval) do 
+    while task.wait(60) do -- ทำงานทุก 1 นาที
+        -- รันการตรวจสอบนี้เฉพาะเมื่อลูปฟาร์มทำงานอยู่ และไม่ได้อยู่ในกระบวนการแปรรูปแร่
         if isOreFarmLoopActive and not isWaitingForRockToClear then
             pcall(function()
                 local char = LocalPlayer.Character
@@ -1112,14 +1172,14 @@ task.spawn(function()
                 
                 if rootPart then
                     local currentPosition = rootPart.Position
-                    local farmPoint = Config.FarmInitialPosition 
+                    -- ใช้ 'initialFarmPosition' เป็นจุดอ้างอิงของ "จุดฟาร์ม"
+                    local farmPoint = initialFarmPosition 
                     
                     local distance = (currentPosition - farmPoint).Magnitude
                     
-                    if distance > Config.FarmAreaCheckDistance then
+                    if distance > 1000 then
                         print("Player is " .. string.format("%.0f", distance) .. " studs away from the farm point. Teleporting back...")
-                        -- [เปลี่ยนกลับ] ใช้ instantTeleportTo
-                        instantTeleportTo(farmPoint)
+                        teleportTo(farmPoint)
                     end
                 end
             end)
@@ -1129,9 +1189,12 @@ end)
 
 
 -- ====================================================================================
--- [แก้ไข] Health-Based Recovery Loop (วาปไปที่ (0,-200,0) แล้วออกจากเกม)
+-- [[ NEW ]] Health-Based Recovery Loop
+-- This loop listens for the 'MaxHealth' attribute in the Player's Status folder.
+-- If MaxHealth drops to 0, it triggers a special recovery sequence.
 -- ====================================================================================
 task.spawn(function()
+    local statusFolder = LocalPlayer:WaitForChild("Status")
     if not statusFolder then
         warn("Health-based recovery: Status folder not found.")
         return
@@ -1142,23 +1205,48 @@ task.spawn(function()
             local maxHealthValue = statusFolder:GetAttribute("MaxHealth")
             if maxHealthValue and maxHealthValue == 0 then
                 
+                -- Spawn a new coroutine to handle the sequence without blocking the event handler
                 task.spawn(function()
-                    print("MaxHealth reached 0. Initiating exit procedure.")
+                    print("MaxHealth reached 0. Initiating special recovery procedure.")
 
-                    -- 1. วาปไปยังพิกัด 0,-200,0
-                    local exitPosition = Vector3.new(0, -200, 0)
-                    print("Teleporting to exit location: " .. tostring(exitPosition))
-                    instantTeleportTo(exitPosition)
+                    -- 1. Stop farming
+                    if isOreFarmLoopActive then
+                        print("Halting ore farming...")
+                        toggleOreFarmLoop(UIElements.FarmOreButton)
+                        task.wait(0.5) -- Small delay to ensure state change
+                    end
 
-                    -- 2. รอ 5 วินาที
-                    print("Waiting for 5 seconds before exiting...")
+                    -- 2. Go to buy food
+                    print("Moving to buy food (Attempt 1)...")
+                    buyFood()
+
+                    -- 3. Wait 30 seconds
+                    print("Waiting for 30 seconds...")
+                    task.wait(30)
+
+                    -- 4. Go to buy food again
+                        print("Moving to buy food (Attempt 2)...")
+                    buyFood()
+
+                    -- 5. Wait 2 seconds
+                    print("Waiting for 2 seconds...")
+                    task.wait(2)
+
+                    -- 6. Warp to recovery coordinates
+                    local recoveryCoords = Vector3.new(50, -200, 50)
+                    print("Warping to recovery location: " .. tostring(recoveryCoords))
+                    teleportTo(recoveryCoords)
+
+                    -- 7. Wait 5 seconds
+                    print("Waiting for 5 seconds before resuming...")
                     task.wait(5)
 
-                    -- 3. ทำการออกจากเกม (Kick ตัวเอง)
-                    print("Exiting game.")
-                    pcall(function()
-                        game:GetService("Players").LocalPlayer:Kick("Kicked by script: Health reached zero.")
-                    end)
+                    -- 8. Restart farming
+                    if not isOreFarmLoopActive then
+                        print("Restarting ore farming...")
+                        toggleOreFarmLoop(UIElements.FarmOreButton)
+                    end
+                    print("Special recovery procedure complete.")
                 end)
             end
         end
@@ -1167,7 +1255,7 @@ task.spawn(function()
 end)
 
 
--- Re-establish character parts on respawn
+-- Re-establish character parts on respawn and connect death handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
@@ -1176,21 +1264,24 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     print("Death recovery system connected for respawned character.")
 end)
 
--- One-time key press when the script starts
-task.wait(5) 
+-- [NEW] Perform a one-time key press when the script starts
+task.wait(5) -- Wait 5 seconds for the game to load before pressing keys
 print("Performing one-time key press (1 + Shift)...")
 pcall(function()
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    -- Simulate pressing '1'
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
     task.wait(0.1)
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
     task.wait(0.5)
+    -- Simulate pressing Left Shift
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
     task.wait(0.1)
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
     print("One-time key press completed.")
 end)
 
--- Auto-start the farm loop
+-- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
 
