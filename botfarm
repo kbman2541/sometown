@@ -2,6 +2,7 @@
 -- Settings
 -- =============================================
 local DIAMOND_ATTRIBUTE_NAME = "Diamond" -- Attribute to display on the counter UI.
+local CASH_ATTRIBUTE_NAME = "Cash" -- Attribute for Cash
 
 -- =============================================
 -- Service Definitions
@@ -97,7 +98,6 @@ end)
 -- UI Elements (Global Scope)
 -- =============================================
 local UIElements 
-local diamondCountLabel 
 local ControlPanelFrame
 local playerListFrame 
 
@@ -201,21 +201,25 @@ end
 -- UI Creation Functions
 -- =============================================
 
--- [MERGED & EDITED] Diamond Counter UI Creation (Moved to the Right)
-local function createDiamondCounterUI()
+-- [MODIFIED] UI Creation for Diamond and Cash Counters
+local function createCountersUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ItemCounterGui"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- New size for two counters
+    local frameWidth = 200
+    local frameHeight = 90
     
     local shadowFrame = Instance.new("Frame")
     shadowFrame.Name = "ShadowFrame"
     shadowFrame.BackgroundColor3 = Color3.new(0, 0, 0)
     shadowFrame.BackgroundTransparency = 0.6
     shadowFrame.BorderSizePixel = 0
-    shadowFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
-    shadowFrame.Position = UDim2.new(1, -15 + 3, 0, 15 + 3) -- Position from right edge
-    shadowFrame.Size = UDim2.new(0, 220, 0, 60)
+    shadowFrame.AnchorPoint = Vector2.new(1, 0) -- Top-right
+    shadowFrame.Position = UDim2.new(1, -15 + 3, 0, 15 + 3) -- Position from right
+    shadowFrame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
     shadowFrame.ZIndex = 1
     shadowFrame.Parent = screenGui
     
@@ -228,9 +232,9 @@ local function createDiamondCounterUI()
     mainFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 54)
     mainFrame.BorderColor3 = Color3.fromRGB(140, 140, 140)
     mainFrame.BorderSizePixel = 1
-    mainFrame.AnchorPoint = Vector2.new(1, 0) -- Set anchor to top-right
-    mainFrame.Position = UDim2.new(1, -15, 0, 15) -- Position from right edge
-    mainFrame.Size = UDim2.new(0, 220, 0, 60)
+    mainFrame.AnchorPoint = Vector2.new(1, 0) -- Top-right
+    mainFrame.Position = UDim2.new(1, -15, 0, 15) -- Position from right
+    mainFrame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
     mainFrame.ZIndex = 2
     mainFrame.Parent = screenGui
     
@@ -238,35 +242,66 @@ local function createDiamondCounterUI()
     uiCorner.CornerRadius = UDim.new(0, 12)
     uiCorner.Parent = mainFrame
     
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "Title"
-    titleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
-    titleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 24
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Position = UDim2.new(0, 15, 0.5, 0)
-    titleLabel.Size = UDim2.new(1, -95, 0, 30)
-    titleLabel.AnchorPoint = Vector2.new(0, 0.5)
-    titleLabel.Parent = mainFrame
+    -- Diamond Title (Top Left)
+    local diamondTitleLabel = Instance.new("TextLabel")
+    diamondTitleLabel.Name = "DiamondTitle"
+    diamondTitleLabel.Text = DIAMOND_ATTRIBUTE_NAME .. ":"
+    diamondTitleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
+    diamondTitleLabel.BackgroundTransparency = 1
+    diamondTitleLabel.Font = Enum.Font.SourceSansBold
+    diamondTitleLabel.TextSize = 20 -- Reduced size
+    diamondTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    diamondTitleLabel.Position = UDim2.new(0, 15, 0, 10) -- Top position
+    diamondTitleLabel.Size = UDim2.new(1, -95, 0, 30)
+    diamondTitleLabel.AnchorPoint = Vector2.new(0, 0)
+    diamondTitleLabel.Parent = mainFrame
     
-    local countLabel = Instance.new("TextLabel")
-    countLabel.Name = "Count"
-    countLabel.Text = "..."
-    countLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-    countLabel.BackgroundTransparency = 1
-    countLabel.Font = Enum.Font.SourceSansBold
-    countLabel.TextSize = 28
-    countLabel.TextXAlignment = Enum.TextXAlignment.Right
-    countLabel.Position = UDim2.new(1, -15, 0.5, 0)
-    countLabel.Size = UDim2.new(0, 80, 0, 30)
-    countLabel.AnchorPoint = Vector2.new(1, 0.5)
-    countLabel.Parent = mainFrame
+    -- Diamond Count (Top Right)
+    local diamondCountLabel = Instance.new("TextLabel")
+    diamondCountLabel.Name = "DiamondCount"
+    diamondCountLabel.Text = "..."
+    diamondCountLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    diamondCountLabel.BackgroundTransparency = 1
+    diamondCountLabel.Font = Enum.Font.SourceSansBold
+    diamondCountLabel.TextSize = 22 -- Reduced size
+    diamondCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+    diamondCountLabel.Position = UDim2.new(1, -15, 0, 10) -- Top position
+    diamondCountLabel.Size = UDim2.new(0, 80, 0, 30)
+    diamondCountLabel.AnchorPoint = Vector2.new(1, 0)
+    diamondCountLabel.Parent = mainFrame
+    
+    -- Cash Title (Bottom Left)
+    local cashTitleLabel = Instance.new("TextLabel")
+    cashTitleLabel.Name = "CashTitle"
+    cashTitleLabel.Text = CASH_ATTRIBUTE_NAME .. ":"
+    cashTitleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
+    cashTitleLabel.BackgroundTransparency = 1
+    cashTitleLabel.Font = Enum.Font.SourceSansBold
+    cashTitleLabel.TextSize = 20 -- Reduced size
+    cashTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    cashTitleLabel.Position = UDim2.new(0, 15, 0, 50) -- Bottom position
+    cashTitleLabel.Size = UDim2.new(1, -95, 0, 30)
+    cashTitleLabel.AnchorPoint = Vector2.new(0, 0)
+    cashTitleLabel.Parent = mainFrame
+    
+    -- Cash Count (Bottom Right)
+    local cashCountLabel = Instance.new("TextLabel")
+    cashCountLabel.Name = "CashCount"
+    cashCountLabel.Text = "..."
+    cashCountLabel.TextColor3 = Color3.fromRGB(100, 255, 100) -- Green for cash
+    cashCountLabel.BackgroundTransparency = 1
+    cashCountLabel.Font = Enum.Font.SourceSansBold
+    cashCountLabel.TextSize = 22 -- Reduced size
+    cashCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+    cashCountLabel.Position = UDim2.new(1, -15, 0, 50) -- Bottom position
+    cashCountLabel.Size = UDim2.new(0, 80, 0, 30)
+    cashCountLabel.AnchorPoint = Vector2.new(1, 0)
+    cashCountLabel.Parent = mainFrame
     
     screenGui.Parent = PlayerGui
     
-    return countLabel
+    -- Return both labels
+    return { diamond = diamondCountLabel, cash = cashCountLabel }
 end
 
 -- Control Panel UI Creation (Responsive)
@@ -274,7 +309,7 @@ local function createControlPanelUI()
     local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "CombinedControlUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
 
     -- [MODIFIED] Increased height for the new button
-    local frameHeight = 400
+    local frameHeight = 440 -- เพิ่มความสูง 40 (จาก 400)
     
     -- Main Draggable Frame
     ControlPanelFrame = Instance.new("Frame"); ControlPanelFrame.Name = "ControlPanelFrame";
@@ -320,6 +355,12 @@ local function createControlPanelUI()
     local BlueLabelButton = Instance.new("TextButton"); BlueLabelButton.Name = "BlueLabelButton"; BlueLabelButton.Size = UDim2.new(1, -20, 0, 30); BlueLabelButton.Position = UDim2.new(0, 10, 0, 240); BlueLabelButton.BackgroundColor3 = Color3.fromRGB(20, 120, 220); BlueLabelButton.Font = Enum.Font.SourceSansBold; BlueLabelButton.Text = "Blue Label (B)"; BlueLabelButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlueLabelButton.TextSize = 16; BlueLabelButton.Parent = ControlsContentFrame
     local UICorner_BlueLabelBtn = Instance.new("UICorner", BlueLabelButton); UICorner_BlueLabelBtn.CornerRadius = UDim.new(0, 6)
 
+    -- [[[[[ NEW ]]]]]
+    -- [NEW] Black Market (ตลาดมืด) Button
+    local BlackMarketButton = Instance.new("TextButton"); BlackMarketButton.Name = "BlackMarketButton"; BlackMarketButton.Size = UDim2.new(1, -20, 0, 30); BlackMarketButton.Position = UDim2.new(0, 10, 0, 280); BlackMarketButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80); BlackMarketButton.Font = Enum.Font.SourceSansBold; BlackMarketButton.Text = "ตลาดมืด (N)"; BlackMarketButton.TextColor3 = Color3.fromRGB(255, 255, 255); BlackMarketButton.TextSize = 16; BlackMarketButton.Parent = ControlsContentFrame
+    local UICorner_BlackMarketBtn = Instance.new("UICorner", BlackMarketButton); UICorner_BlackMarketBtn.CornerRadius = UDim.new(0, 6)
+    -- [[[[[ END NEW ]]]]]
+
     -- Players Content
     local PlayersContentFrame = Instance.new("Frame"); PlayersContentFrame.Name = "PlayersContent"; PlayersContentFrame.Size = UDim2.new(1, 0, 1, 0); PlayersContentFrame.BackgroundTransparency = 1; PlayersContentFrame.Parent = ContentContainer; PlayersContentFrame.Visible = false
     local WalkToKealohaButton = Instance.new("TextButton"); WalkToKealohaButton.Name = "WalkToKealohaButton"; WalkToKealohaButton.Size = UDim2.new(1, -20, 0, 30); WalkToKealohaButton.Position = UDim2.new(0, 10, 0, 5); WalkToKealohaButton.BackgroundColor3 = Color3.fromRGB(220, 120, 0); WalkToKealohaButton.Font = Enum.Font.SourceSansBold; WalkToKealohaButton.Text = "Find KealohaWeaver5712"; WalkToKealohaButton.TextColor3 = Color3.fromRGB(255, 255, 255); WalkToKealohaButton.TextSize = 16; WalkToKealohaButton.Parent = PlayersContentFrame
@@ -333,6 +374,7 @@ local function createControlPanelUI()
     MoveToSellButton.Text = "Sell Point (G)"
     SellLoopButton.Text = "Loop Sell (V)"
     BlueLabelButton.Text = "Blue Label (B)"
+    BlackMarketButton.Text = "ตลาดมืด (N)" -- [NEW]
 
     return {
         ScreenGui = ScreenGui,
@@ -344,7 +386,8 @@ local function createControlPanelUI()
         BuyFoodButton = BuyFoodButton,
         MoveToSellButton = MoveToSellButton,
         SellLoopButton = SellLoopButton,
-        BlueLabelButton = BlueLabelButton, -- Added new button here
+        BlueLabelButton = BlueLabelButton,
+        BlackMarketButton = BlackMarketButton, -- [NEW]
         WalkToKealohaButton = WalkToKealohaButton,
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
@@ -359,7 +402,7 @@ end
 -- =============================================
 -- State Variables
 local isCollapsed = false
-local originalSize = UDim2.new(0, 250, 0, 400) -- Updated size
+local originalSize = UDim2.new(0, 250, 0, 440) -- Updated size
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local isOreFarmLoopActive = false
 local inventoryConnection = nil
@@ -376,27 +419,39 @@ local pickaxeCheckTimer = 0 -- [NEW] Timer for pickaxe check
 -- [NEW] นำตัวแปร Stamina กลับมา
 local lastStaminaValue = -1 
 local staminaCheckTimer = 0 
+local isLowHealthTeleporting = false -- [NEW] Cooldown for low health teleport
 
--- Logic for Diamond Counter
-local function setupDiamondCounter(countLabel)
+-- [MODIFIED] Logic for Diamond and Cash Counters
+local function setupCounters(counterLabels)
     if not inventoryFolder then 
-        warn("Diamond Counter: Inventory folder not found!")
+        warn("Counters UI: Inventory folder not found!")
         return
     end
 
-    local function updateAttributeCount()
+    local diamondLabel = counterLabels.diamond
+    local cashLabel = counterLabels.cash
+
+    local function updateDiamondCount()
         local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
-        countLabel.Text = tostring(amount)
+        diamondLabel.Text = tostring(amount)
     end
 
-    updateAttributeCount() -- Initial update
+    local function updateCashCount()
+        local amount = inventoryFolder:GetAttribute(CASH_ATTRIBUTE_NAME) or 0
+        cashLabel.Text = tostring(amount) -- Format as plain number
+    end
+
+    updateDiamondCount() -- Initial update
+    updateCashCount() -- Initial update
 
     inventoryFolder.AttributeChanged:Connect(function(attributeName)
         if attributeName == DIAMOND_ATTRIBUTE_NAME then
-            updateAttributeCount()
+            updateDiamondCount()
+        elseif attributeName == CASH_ATTRIBUTE_NAME then
+            updateCashCount()
         end
     end)
-    print("Diamond Counter UI logic initialized.")
+    print("Counters UI logic initialized.")
 end
 
 
@@ -885,10 +940,10 @@ end
 -- =============================================
 -- Create UIs
 UIElements = createControlPanelUI()
-diamondCountLabel = createDiamondCounterUI()
+local counterLabels = createCountersUI() -- [MODIFIED]
 
 -- Setup Logic
-setupDiamondCounter(diamondCountLabel)
+setupCounters(counterLabels) -- [MODIFIED]
 originalSize = UIElements.ControlPanelFrame.Size -- Update original size from created UI
 
 -- Connect Death Handler
@@ -1064,6 +1119,17 @@ UIElements.BlueLabelButton.MouseButton1Click:Connect(function()
     teleportTo(Vector3.new(1936, 15, 2285))
 end)
 
+-- [[[[[ NEW ]]]]]
+-- [NEW] Connect the black market button
+UIElements.BlackMarketButton.MouseButton1Click:Connect(function() 
+    print("Moving to Black Market (ตลาดมืด)...")
+    -- =================================================================
+    -- หมายเหตุ: พิกัด "ตลาดมืด"
+    -- =================================================================
+    teleportTo(Vector3.new(3090, 22, 2614)) 
+end)
+-- [[[[[ END NEW ]]]]]
+
 -- [[[[[ บล็อคใหม่ ]]]]]
 -- พับ UI ตอนเริ่มต้นเกมตามที่ผู้ใช้ร้องขอ
 print("Collapsing UI on start...")
@@ -1101,6 +1167,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     elseif input.KeyCode == Enum.KeyCode.B then
         print("Key B pressed: Moving to Blue Label")
         teleportTo(Vector3.new(1936, 15, 2285))
+        
+    -- [[[[[ NEW ]]]]]
+    elseif input.KeyCode == Enum.KeyCode.N then
+        print("Key N pressed: Moving to Black Market (ตลาดมืด)")
+        -- =================================================================
+        -- หมายเหตุ: พิกัด "ตลาดมืด"
+        -- =================================================================
+        teleportTo(Vector3.new(3090, 22, 2614)) 
+    -- [[[[[ END NEW ]]]]]
         
     end
 end)
@@ -1189,9 +1264,10 @@ end)
 
 
 -- ====================================================================================
--- [[ NEW ]] Health-Based Recovery Loop
--- This loop listens for the 'MaxHealth' attribute in the Player's Status folder.
--- If MaxHealth drops to 0, it triggers a special recovery sequence.
+-- [[ MODIFIED ]] Health-Based Recovery Loop
+-- This loop checks the player's current "Health" attribute.
+-- If Health drops below 30, it stops farming and teleports to the food store.
+-- It includes a cooldown to prevent spamming.
 -- ====================================================================================
 task.spawn(function()
     local statusFolder = LocalPlayer:WaitForChild("Status")
@@ -1201,57 +1277,41 @@ task.spawn(function()
     end
 
     statusFolder.AttributeChanged:Connect(function(attributeName)
-        if attributeName == "MaxHealth" then
-            local maxHealthValue = statusFolder:GetAttribute("MaxHealth")
-            if maxHealthValue and maxHealthValue == 0 then
+        -- We only care about the "Health" attribute changing
+        if attributeName == "Health" then
+            local healthValue = statusFolder:GetAttribute("Health")
+            
+            -- Check if health is low AND we are not already in the process of teleporting
+            if healthValue and healthValue < 30 and not isLowHealthTeleporting then
                 
-                -- Spawn a new coroutine to handle the sequence without blocking the event handler
+                isLowHealthTeleporting = true -- Set the flag to true to start the cooldown
+                
+                -- Spawn a new coroutine to handle the teleport without blocking the event
                 task.spawn(function()
-                    print("MaxHealth reached 0. Initiating special recovery procedure.")
+                    print("Health is low (" .. tostring(healthValue) .. "). Initiating emergency teleport to 0, -200, 0.")
 
-                    -- 1. Stop farming
+                    -- 1. Stop farming if it's active
                     if isOreFarmLoopActive then
                         print("Halting ore farming...")
                         toggleOreFarmLoop(UIElements.FarmOreButton)
                         task.wait(0.5) -- Small delay to ensure state change
                     end
 
-                    -- 2. Go to buy food
-                    print("Moving to buy food (Attempt 1)...")
-                    buyFood()
+                    -- 2. Call the buyFood function (which includes teleporting)
+                    print("Teleporting to 0, -200, 0...")
+                    teleportTo(Vector3.new(0, -200, 0))
 
-                    -- 3. Wait 30 seconds
-                    print("Waiting for 30 seconds...")
-                    task.wait(30)
-
-                    -- 4. Go to buy food again
-                        print("Moving to buy food (Attempt 2)...")
-                    buyFood()
-
-                    -- 5. Wait 2 seconds
-                    print("Waiting for 2 seconds...")
-                    task.wait(2)
-
-                    -- 6. Warp to recovery coordinates
-                    local recoveryCoords = Vector3.new(50, -200, 50)
-                    print("Warping to recovery location: " .. tostring(recoveryCoords))
-                    teleportTo(recoveryCoords)
-
-                    -- 7. Wait 5 seconds
-                    print("Waiting for 5 seconds before resuming...")
-                    task.wait(5)
-
-                    -- 8. Restart farming
-                    if not isOreFarmLoopActive then
-                        print("Restarting ore farming...")
-                        toggleOreFarmLoop(UIElements.FarmOreButton)
-                    end
-                    print("Special recovery procedure complete.")
+                    -- 3. Wait for 60 seconds (cooldown) before allowing this to trigger again
+                    print("Teleport complete. Starting 60 second recovery cooldown.")
+                    task.wait(60)
+                    
+                    print("Recovery cooldown finished. Low health teleport is re-enabled.")
+                    isLowHealthTeleporting = false -- Reset the flag
                 end)
             end
         end
     end)
-    print("Health-based recovery system is active.")
+    print("Health-based recovery system (Health < 30) is active.")
 end)
 
 
