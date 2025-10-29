@@ -1,0 +1,84 @@
+-- Script to monitor the visibility changes of the Market UI
+-- [VERSION 3: MONITORING CHILD ADDED/REMOVED]
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+print("Market Monitor V3: Waiting for PlayerGui...")
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+print("Market Monitor V3: PlayerGui found.")
+print("=====================================================================")
+print("Market Monitor V3: NOW MONITORING... Please try to open/close the Market UI.")
+print("=====================================================================")
+
+-- Listen for ANY child being added to PlayerGui
+PlayerGui.ChildAdded:Connect(function(child)
+    print("-----------------------------------------")
+    print("Market Monitor V3: [CHILD ADDED] to PlayerGui!")
+    print("Child Name: " .. child.Name)
+    print("Child Class: " .. child.ClassName)
+    print("-----------------------------------------")
+    
+    -- If the added child is the Market UI, let's try to monitor it
+    if child.Name == "Market" and child:IsA("ScreenGui") then
+        print("Market Monitor V3: >>> Market ScreenGui was ADDED! <<<")
+        
+        local canvasGroup = child:FindFirstChild("CanvasGroup")
+        if canvasGroup then
+            print("Market Monitor V3: Found CanvasGroup inside new Market. Monitoring it now.")
+            
+            -- Monitor Visible
+            canvasGroup:GetPropertyChangedSignal("Visible"):Connect(function()
+                print("Market Monitor V3: >>> Market.CanvasGroup.Visible changed! New state: " .. tostring(canvasGroup.Visible))
+            end)
+            
+            -- Monitor Position
+            canvasGroup:GetPropertyChangedSignal("Position"):Connect(function()
+                print("Market Monitor V3: >>> Market.CanvasGroup.Position changed! New state: " .. tostring(canvasGroup.Position))
+            end)
+        else
+            warn("Market Monitor V3: Market GUI was added, but CanvasGroup not found inside it.")
+        end
+    end
+end)
+
+-- Listen for ANY child being removed from PlayerGui
+PlayerGui.ChildRemoved:Connect(function(child)
+    print("-----------------------------------------")
+    print("Market Monitor V3: [CHILD REMOVED] from PlayerGui!")
+    print("Child Name: " .. child.Name)
+    print("Child Class: " .. child.ClassName)
+    print("-----------------------------------------")
+    
+    if child.Name == "Market" then
+        print("Market Monitor V3: >>> Market ScreenGui was REMOVED! <<<")
+    end
+end)
+
+-- Also, let's keep monitoring the existing one, just in case it's not added/removed
+local existingMarketGui = PlayerGui:FindFirstChild("Market")
+if existingMarketGui then
+    print("Market Monitor V3: Found an existing 'Market' GUI. Monitoring its properties too.")
+    
+    -- Monitor ScreenGui.Enabled
+    existingMarketGui:GetPropertyChangedSignal("Enabled"):Connect(function()
+         print("--- (Existing) Market ScreenGui.Enabled changed to: " .. tostring(existingMarketGui.Enabled) .. " ---")
+    end)
+    
+    local existingCanvasGroup = existingMarketGui:FindFirstChild("CanvasGroup")
+    if existingCanvasGroup then
+        print("Market Monitor V3: Found existing CanvasGroup. Monitoring Visible/Position.")
+        
+        -- Monitor Visible
+        existingCanvasGroup:GetPropertyChangedSignal("Visible"):Connect(function()
+            print("--- (Existing) Market.CanvasGroup.Visible changed! New state: " .. tostring(existingCanvasGroup.Visible) .. " ---")
+        end)
+        
+        -- Monitor Position
+        existingCanvasGroup:GetPropertyChangedSignal("Position"):Connect(function()
+            print("--- (Existing) Market.CanvasGroup.Position changed! New state: " .. tostring(existingCanvasGroup.Position) .. " ---")
+        end)
+    end
+end
+
