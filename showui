@@ -1,84 +1,179 @@
--- Script to monitor the visibility changes of the Market UI
--- [VERSION 3: MONITORING CHILD ADDED/REMOVED]
+local PLAYER_SERVICE = game:GetService("Players")
+local WORKSPACE = game:GetService("Workspace")
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local localPlayer = PLAYER_SERVICE.LocalPlayer
+if not localPlayer then
+    localPlayer = PLAYER_SERVICE.PlayerAdded:Wait()
+end
 
-print("Market Monitor V3: Waiting for PlayerGui...")
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("ของขวัญให้ตำรวจ", "BloodTheme") 
 
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-print("Market Monitor V3: PlayerGui found.")
-print("=====================================================================")
-print("Market Monitor V3: NOW MONITORING... Please try to open/close the Market UI.")
-print("=====================================================================")
+-- (ใหม่) สร้างแท็บหลักสำหรับตั้งค่าการพับหน้าจอ
+local mainTab = Window:NewTab("Main")
+local mainSection = mainTab:NewSection("ตั้งค่า")
+mainSection:NewLabel("สคริปต์ทำงานแล้ว (โหมด Tab ต่อไอเท็ม)")
+mainSection:NewKeybind("พับหน้าจอ (Toggle UI)", "กดเพื่อตั้งปุ่ม (ค่าเริ่มต้น: P)", Enum.KeyCode.P, function()
+	Library:ToggleUI()
+end)
 
--- Listen for ANY child being added to PlayerGui
-PlayerGui.ChildAdded:Connect(function(child)
-    print("-----------------------------------------")
-    print("Market Monitor V3: [CHILD ADDED] to PlayerGui!")
-    print("Child Name: " .. child.Name)
-    print("Child Class: " .. child.ClassName)
-    print("-----------------------------------------")
+local itemUiElements = {} 
+
+local function findVehicleByPlate(plateName)
+    local playerVehicleFolder = WORKSPACE:WaitForChild("PlayerVehicle", 5)
+    if not playerVehicleFolder then 
+        warn("findVehicleByPlate: ไม่พบโฟลเดอร์ PlayerVehicle")
+        return nil 
+    end
     
-    -- If the added child is the Market UI, let's try to monitor it
-    if child.Name == "Market" and child:IsA("ScreenGui") then
-        print("Market Monitor V3: >>> Market ScreenGui was ADDED! <<<")
+    for _, vehicleModel in ipairs(playerVehicleFolder:GetChildren()) do
+        if not vehicleModel:IsA("Model") then continue end
         
-        local canvasGroup = child:FindFirstChild("CanvasGroup")
-        if canvasGroup then
-            print("Market Monitor V3: Found CanvasGroup inside new Market. Monitoring it now.")
-            
-            -- Monitor Visible
-            canvasGroup:GetPropertyChangedSignal("Visible"):Connect(function()
-                print("Market Monitor V3: >>> Market.CanvasGroup.Visible changed! New state: " .. tostring(canvasGroup.Visible))
-            end)
-            
-            -- Monitor Position
-            canvasGroup:GetPropertyChangedSignal("Position"):Connect(function()
-                print("Market Monitor V3: >>> Market.CanvasGroup.Position changed! New state: " .. tostring(canvasGroup.Position))
-            end)
+        local plateValue
+        local plateAttr = vehicleModel:GetAttribute("Plate")
+        if plateAttr then
+            plateValue = plateAttr
         else
-            warn("Market Monitor V3: Market GUI was added, but CanvasGroup not found inside it.")
+            local plateValueObj = vehicleModel:FindFirstChild("Plate")
+            if plateValueObj and plateValueObj:IsA("StringValue") then
+                plateValue = plateValueObj.Value
+            end
+        end
+        
+        if plateValue and string.lower(plateValue) == string.lower(plateName) then
+            return vehicleModel
         end
     end
-end)
+    print("findVehicleByPlate: ไม่พบรถที่มีป้ายทะเบียน: " .. plateName)
+    return nil
+end
 
--- Listen for ANY child being removed from PlayerGui
-PlayerGui.ChildRemoved:Connect(function(child)
-    print("-----------------------------------------")
-    print("Market Monitor V3: [CHILD REMOVED] from PlayerGui!")
-    print("Child Name: " .. child.Name)
-    print("Child Class: " .. child.ClassName)
-    print("-----------------------------------------")
+local function addVehicleSettings(plateName, section)
     
-    if child.Name == "Market" then
-        print("Market Monitor V3: >>> Market ScreenGui was REMOVED! <<<")
+    local vehicleModel = findVehicleByPlate(plateName)
+    if not vehicleModel then
+        print("ไม่พบรถสำหรับป้ายทะเบียน: " .. plateName)
+        section:NewLabel("Vehicle not found for: " .. plateName)
+        return
     end
-end)
+    
+    local settingsFolder = vehicleModel:FindFirstChild("Settings")
+    if not settingsFolder then
+        print("ไม่พบโฟลเดอร์ Settings ในรถ: " .. vehicleModel.Name)
+        section:NewLabel("Settings folder not found in: " .. vehicleModel.Name)
+        return
+    end
+    
+    print("พบการตั้งค่าสำหรับ: " .. plateName)
+    
+    section:NewLabel(string.format("--- %s (%s) ---", vehicleModel.Name, plateName))
 
--- Also, let's keep monitoring the existing one, just in case it's not added/removed
-local existingMarketGui = PlayerGui:FindFirstChild("Market")
-if existingMarketGui then
-    print("Market Monitor V3: Found an existing 'Market' GUI. Monitoring its properties too.")
+    local attributes = settingsFolder:GetAttributes()
     
-    -- Monitor ScreenGui.Enabled
-    existingMarketGui:GetPropertyChangedSignal("Enabled"):Connect(function()
-         print("--- (Existing) Market ScreenGui.Enabled changed to: " .. tostring(existingMarketGui.Enabled) .. " ---")
-    end)
+    local attrCount = 0
+    if attributes then
+        for _ in pairs(attributes) do attrCount = attrCount + 1 end
+    end
+    print(string.format("พบ %d attributes ใน Settings", attrCount))
+    if attrCount == 0 then
+        section:NewLabel("Settings folder found, but it has 0 attributes.")
+    end
     
-    local existingCanvasGroup = existingMarketGui:FindFirstChild("CanvasGroup")
-    if existingCanvasGroup then
-        print("Market Monitor V3: Found existing CanvasGroup. Monitoring Visible/Position.")
+    for attrName, attrValue in pairs(attributes) do
+        local valueType = typeof(attrValue)
         
-        -- Monitor Visible
-        existingCanvasGroup:GetPropertyChangedSignal("Visible"):Connect(function()
-            print("--- (Existing) Market.CanvasGroup.Visible changed! New state: " .. tostring(existingCanvasGroup.Visible) .. " ---")
-        end)
-        
-        -- Monitor Position
-        existingCanvasGroup:GetPropertyChangedSignal("Position"):Connect(function()
-            print("--- (Existing) Market.CanvasGroup.Position changed! New state: " .. tostring(existingCanvasGroup.Position) .. " ---")
-        end)
+        if valueType == "number" or valueType == "string" or valueType == "boolean" then
+            local labelText = string.format("%s: %s", attrName, tostring(attrValue))
+            local infoText = "Enter new value..." 
+            
+            section:NewTextBox(labelText, infoText, function(txt)
+                local newValue
+                local success = pcall(function()
+                    if valueType == "number" then
+                        newValue = tonumber(txt)
+                        if newValue == nil then error("invalid number") end
+                    elseif valueType == "boolean" then
+                        local t = string.lower(txt)
+                        if t == "true" or t == "t" or t == "1" then
+                            newValue = true
+                        elseif t == "false" or t == "f" or t == "0" then
+                            newValue = false
+                        else
+                            error("invalid boolean (try true/false)")
+                        end
+                    else 
+                        newValue = txt
+                    end
+                    
+                    settingsFolder:SetAttribute(attrName, newValue)
+                end)
+                
+                if success then
+                    print("Set attribute " .. attrName .. " to " .. tostring(newValue))
+                else
+                    warn("Invalid value entered for " .. attrName .. ": " .. txt)
+                end
+            end)
+
+        elseif valueType == "Color3" then
+            local labelText = string.format("%s: (Color)", attrName)
+            section:NewColorPicker(labelText, "Change color", attrValue, function(color)
+                settingsFolder:SetAttribute(attrName, color)
+            end)
+
+        else
+            section:NewLabel(string.format("%s: %s (Read-only)", attrName, tostring(attrValue)))
+        end
     end
 end
+
+local function initializeInventory()
+    local inventoryFolder = localPlayer:WaitForChild("Inventory", 10)
+
+    if not inventoryFolder then
+        warn("ไม่พบโฟลเดอร์ Inventory")
+        -- (แก้ไข) เรามีแท็บ Main อยู่แล้ว ไม่ต้องสร้างแท็บ Error
+        mainSection:NewLabel("ไม่พบโฟลเดอร์ Inventory!")
+        return
+    end
+    
+    -- นี่คือส่วนที่ "เช็คตลอด" อยู่แล้ว
+    inventoryFolder.ChildAdded:Connect(function(item)
+        if not itemUiElements[item] then
+            print("ไอเท็มเพิ่ม, สร้างแท็บ: ", item.Name)
+            
+            local newTab = Window:NewTab(item.Name)
+            local newSection = newTab:NewSection("Vehicle Data")
+            
+            addVehicleSettings(item.Name, newSection)
+            
+            itemUiElements[item] = newTab 
+        end
+    end)
+
+    -- นี่คือส่วนที่ "เช็คตลอด" อยู่แล้ว
+    inventoryFolder.ChildRemoved:Connect(function(item)
+        local tabToRemove = itemUiElements[item] 
+        if tabToRemove then
+            print("ไอเท็มถูกลบ, ลบแท็บ: ", item.Name)
+            pcall(function() tabToRemove:Destroy() end) 
+            itemUiElements[item] = nil
+        end
+    end)
+    
+    for _, item in ipairs(inventoryFolder:GetChildren()) do
+        if not itemUiElements[item] then
+            
+            local newTab = Window:NewTab(item.Name)
+            local newSection = newTab:NewSection("Vehicle Data")
+            addVehicleSettings(item.Name, newSection)
+            itemUiElements[item] = newTab
+
+        end
+    end
+    
+    print("Vehicle Settings GUI (Kavo/Rayfield) ใช้งานแล้ว (โหมด Tab ต่อไอเท็ม)")
+end
+
+coroutine.wrap(initializeInventory)()
 
