@@ -1314,6 +1314,54 @@ task.spawn(function()
     print("Health-based recovery system (Health < 30) is active.")
 end)
 
+-- ====================================================================================
+-- [[[[[ บล็อคใหม่: ตรวจสอบจำนวนผู้เล่นออนไลน์ ]]]]]
+-- ตรวจสอบค่า TextLabel ที่ระบุ
+-- ถ้าค่าเป็น 35 หรือมากกว่า ให้ทำการออกจากเกมทันที
+-- ====================================================================================
+task.spawn(function()
+    local textLabelPath = "Scoreboard.CanvasGroup.Frame.Status.Online.TextLabel"
+    print("Starting online player check loop for: " .. textLabelPath)
+
+    while task.wait(1) do -- ตรวจสอบทุก 1 วินาที
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then
+            -- print("PlayerGui not found, waiting...")
+            continue
+        end
+
+        -- ใช้ pcall เพื่อป้องกัน error หาก UI ยังไม่โหลด
+        local success, textLabel = pcall(function()
+            -- เราจะใช้ FindFirstChild แบบต่อกันไปเรื่อยๆ แทน WaitForChild เพื่อไม่ให้ลูปค้าง
+            -- หาก UI หายไปชั่วขณะ
+            return playerGui:FindFirstChild("Scoreboard")
+                           :FindFirstChild("CanvasGroup")
+                           :FindFirstChild("Frame")
+                           :FindFirstChild("Status")
+                           :FindFirstChild("Online")
+                           :FindFirstChild("TextLabel")
+        end)
+
+        if success and textLabel then
+            local textValue = textLabel.Text
+            local onlineCount = tonumber(textValue)
+
+            if onlineCount then
+                -- print("Current online count: " .. onlineCount) -- for debugging
+                if onlineCount >= 35 then
+                    print("Online count is " .. onlineCount .. " (>= 35). Kicking player.")
+                    LocalPlayer:Kick("Player count is " .. onlineCount .. ". Exiting.")
+                    break -- หยุดลูปหลังจากสั่ง kick
+                end
+            else
+                -- print("Could not convert text to number: '" .. textValue .. "'") -- for debugging
+            end
+        else
+            -- print("TextLabel not found at path: " .. textLabelPath) -- for debugging
+        end
+    end
+end)
+
 
 -- Re-establish character parts on respawn and connect death handler
 LocalPlayer.CharacterAdded:Connect(function(char)
