@@ -2,7 +2,8 @@
 -- Settings
 -- =============================================
 local DIAMOND_ATTRIBUTE_NAME = "Diamond" -- Attribute to display on the counter UI.
-local CASH_ATTRIBUTE_NAME = "Cash" -- Attribute for Cash
+local CASH_ATTRIBUTE_NAME = "Bank" -- [CHANGED] Attribute for Bank ( geändert von "Text" zu "Bank" wie gewünscht )
+local REAL_CASH_ATTRIBUTE_NAME = "Cash" -- [NEW] Attribute for real cash
 
 -- =============================================
 -- Service Definitions
@@ -201,16 +202,16 @@ end
 -- UI Creation Functions
 -- =============================================
 
--- [MODIFIED] UI Creation for Diamond and Cash Counters
+-- [MODIFIED] UI Creation for Diamond, Bank, and Cash Counters
 local function createCountersUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ItemCounterGui"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- New size for two counters
+    -- New size for three counters
     local frameWidth = 200
-    local frameHeight = 90
+    local frameHeight = 130 -- [CHANGED] Increased height
     
     local shadowFrame = Instance.new("Frame")
     shadowFrame.Name = "ShadowFrame"
@@ -270,21 +271,49 @@ local function createCountersUI()
     diamondCountLabel.AnchorPoint = Vector2.new(1, 0)
     diamondCountLabel.Parent = mainFrame
     
-    -- Cash Title (Bottom Left)
+    -- Bank Title (Middle Left)
+    local bankTitleLabel = Instance.new("TextLabel")
+    bankTitleLabel.Name = "BankTitle"
+    bankTitleLabel.Text = CASH_ATTRIBUTE_NAME .. ":" -- Will show "Bank:"
+    bankTitleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
+    bankTitleLabel.BackgroundTransparency = 1
+    bankTitleLabel.Font = Enum.Font.SourceSansBold
+    bankTitleLabel.TextSize = 20 -- Reduced size
+    bankTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    bankTitleLabel.Position = UDim2.new(0, 15, 0, 50) -- Middle position
+    bankTitleLabel.Size = UDim2.new(1, -95, 0, 30)
+    bankTitleLabel.AnchorPoint = Vector2.new(0, 0)
+    bankTitleLabel.Parent = mainFrame
+    
+    -- Bank Count (Middle Right)
+    local bankCountLabel = Instance.new("TextLabel")
+    bankCountLabel.Name = "BankCount"
+    bankCountLabel.Text = "..."
+    bankCountLabel.TextColor3 = Color3.fromRGB(100, 255, 100) -- Green for bank
+    bankCountLabel.BackgroundTransparency = 1
+    bankCountLabel.Font = Enum.Font.SourceSansBold
+    bankCountLabel.TextSize = 22 -- Reduced size
+    bankCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+    bankCountLabel.Position = UDim2.new(1, -15, 0, 50) -- Middle position
+    bankCountLabel.Size = UDim2.new(0, 80, 0, 30)
+    bankCountLabel.AnchorPoint = Vector2.new(1, 0)
+    bankCountLabel.Parent = mainFrame
+    
+    -- [NEW] Cash Title (Bottom Left)
     local cashTitleLabel = Instance.new("TextLabel")
     cashTitleLabel.Name = "CashTitle"
-    cashTitleLabel.Text = CASH_ATTRIBUTE_NAME .. ":"
+    cashTitleLabel.Text = REAL_CASH_ATTRIBUTE_NAME .. ":" -- Will show "Cash:"
     cashTitleLabel.TextColor3 = Color3.fromRGB(248, 248, 242)
     cashTitleLabel.BackgroundTransparency = 1
     cashTitleLabel.Font = Enum.Font.SourceSansBold
     cashTitleLabel.TextSize = 20 -- Reduced size
     cashTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    cashTitleLabel.Position = UDim2.new(0, 15, 0, 50) -- Bottom position
+    cashTitleLabel.Position = UDim2.new(0, 15, 0, 90) -- Bottom position
     cashTitleLabel.Size = UDim2.new(1, -95, 0, 30)
     cashTitleLabel.AnchorPoint = Vector2.new(0, 0)
     cashTitleLabel.Parent = mainFrame
     
-    -- Cash Count (Bottom Right)
+    -- [NEW] Cash Count (Bottom Right)
     local cashCountLabel = Instance.new("TextLabel")
     cashCountLabel.Name = "CashCount"
     cashCountLabel.Text = "..."
@@ -293,15 +322,15 @@ local function createCountersUI()
     cashCountLabel.Font = Enum.Font.SourceSansBold
     cashCountLabel.TextSize = 22 -- Reduced size
     cashCountLabel.TextXAlignment = Enum.TextXAlignment.Right
-    cashCountLabel.Position = UDim2.new(1, -15, 0, 50) -- Bottom position
+    cashCountLabel.Position = UDim2.new(1, -15, 0, 90) -- Bottom position
     cashCountLabel.Size = UDim2.new(0, 80, 0, 30)
     cashCountLabel.AnchorPoint = Vector2.new(1, 0)
     cashCountLabel.Parent = mainFrame
     
     screenGui.Parent = PlayerGui
     
-    -- Return both labels
-    return { diamond = diamondCountLabel, cash = cashCountLabel }
+    -- Return all three labels
+    return { diamond = diamondCountLabel, bank = bankCountLabel, cash = cashCountLabel }
 end
 
 -- Control Panel UI Creation (Responsive)
@@ -373,7 +402,7 @@ local function createControlPanelUI()
     BuyFoodButton.Text = "Buy Food (H)"
     MoveToSellButton.Text = "Sell Point (G)"
     SellLoopButton.Text = "Loop Sell (V)"
-    BlueLabelButton.Text = "Blue Label (B)"
+    BlueLabelButton.Text = "ATM (B)" -- [ CHANGED ]
     BlackMarketButton.Text = "ตลาดมืด (N)" -- [NEW]
 
     return {
@@ -388,7 +417,7 @@ local function createControlPanelUI()
         SellLoopButton = SellLoopButton,
         BlueLabelButton = BlueLabelButton,
         BlackMarketButton = BlackMarketButton, -- [NEW]
-        WalkToKealohaButton = WalkToKealohaButton,
+        WalkToKealohaButton = WalkToKealohaButton, -- [FIXED TYPO]
         ControlsTabButton = ControlsTabButton,
         PlayersTabButton = PlayersTabButton,
         ControlsContentFrame = ControlsContentFrame,
@@ -421,37 +450,78 @@ local lastStaminaValue = -1
 local staminaCheckTimer = 0 
 local isLowHealthTeleporting = false -- [NEW] Cooldown for low health teleport
 
--- [MODIFIED] Logic for Diamond and Cash Counters
+-- [MODIFIED] Logic for Diamond, Bank ContentText, and Cash Attribute Counters
 local function setupCounters(counterLabels)
+    
+    local diamondLabel = counterLabels.diamond
+    local bankDisplayLabel = counterLabels.bank -- This is OUR UI label
+    local cashDisplayLabel = counterLabels.cash   -- This is OUR UI label
+
+    -- Part 1: Diamond and Cash Attribute Counters (from inventoryFolder)
     if not inventoryFolder then 
-        warn("Counters UI: Inventory folder not found!")
+        warn("Counters UI: Inventory folder not found for Diamond/Cash counters!")
+        diamondLabel.Text = "ERR"
+        cashDisplayLabel.Text = "ERR"
+    else
+        -- Diamond
+        local function updateDiamondCount()
+            local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
+            diamondLabel.Text = tostring(amount)
+        end
+        updateDiamondCount() -- Initial update
+
+        -- Cash
+        local function updateCashCount()
+            local amount = inventoryFolder:GetAttribute(REAL_CASH_ATTRIBUTE_NAME) or 0
+            cashDisplayLabel.Text = tostring(amount)
+        end
+        updateCashCount() -- Initial update
+
+        -- Combined Attribute Listener
+        inventoryFolder.AttributeChanged:Connect(function(attributeName)
+            if attributeName == DIAMOND_ATTRIBUTE_NAME then
+                updateDiamondCount()
+            elseif attributeName == REAL_CASH_ATTRIBUTE_NAME then
+                updateCashCount()
+            end
+        end)
+        print("Diamond and Cash Attribute Counter UI logic initialized.")
+    end
+
+    -- Part 2: Bank ContentText Counter (from game's UI)
+    local gameBankLabel = nil -- This is the GAME'S label
+    
+    pcall(function()
+        gameBankLabel = PlayerGui:WaitForChild("Bank", 10)
+            :WaitForChild("CanvasGroup", 10)
+            :WaitForChild("Frame", 10)
+            :WaitForChild("Bank", 10)
+    end)
+
+    if not gameBankLabel then
+        warn("Bank TextLabel not found at: PlayerGui.Bank.CanvasGroup.Frame.Bank. 'Bank' counter will not work.")
+        bankDisplayLabel.Text = "ERR"
         return
     end
-
-    local diamondLabel = counterLabels.diamond
-    local cashLabel = counterLabels.cash
-
-    local function updateDiamondCount()
-        local amount = inventoryFolder:GetAttribute(DIAMOND_ATTRIBUTE_NAME) or 0
-        diamondLabel.Text = tostring(amount)
+    
+    print("Bank TextLabel found. Initializing ContentText listener.")
+    
+    -- Function to update our UI from the bank's UI
+    local function updateBankTextCounter()
+        bankDisplayLabel.Text = gameBankLabel.ContentText
     end
-
-    local function updateCashCount()
-        local amount = inventoryFolder:GetAttribute(CASH_ATTRIBUTE_NAME) or 0
-        cashLabel.Text = tostring(amount) -- Format as plain number
-    end
-
-    updateDiamondCount() -- Initial update
-    updateCashCount() -- Initial update
-
-    inventoryFolder.AttributeChanged:Connect(function(attributeName)
-        if attributeName == DIAMOND_ATTRIBUTE_NAME then
-            updateDiamondCount()
-        elseif attributeName == CASH_ATTRIBUTE_NAME then
-            updateCashCount()
+    
+    -- Initial update
+    updateBankTextCounter()
+    
+    -- Listen for changes on the Bank TextLabel
+    gameBankLabel.Changed:Connect(function(property)
+        if property == "ContentText" then
+            updateBankTextCounter()
         end
     end)
-    print("Counters UI logic initialized.")
+    
+    print("Counters UI logic initialized (Diamond, Bank ContentText, Cash Attribute).")
 end
 
 
@@ -768,8 +838,11 @@ local function toggleOreFarmLoop(farmButton)
         timeStationary = 0
         
         if not inventoryConnection then
+            -- [MODIFIED] Check for Rock attribute only for farming logic
             inventoryConnection = inventoryFolder.AttributeChanged:Connect(function(attributeName)
-                onInventoryChanged(attributeName, farmButton)
+                if attributeName == "Rock" then
+                    onInventoryChanged(attributeName, farmButton)
+                end
             end)
         end
         
@@ -944,6 +1017,7 @@ local counterLabels = createCountersUI() -- [MODIFIED]
 
 -- Setup Logic
 setupCounters(counterLabels) -- [MODIFIED]
+-- pcall(setupBankTextLabelUpdater) -- [REMOVED]
 originalSize = UIElements.ControlPanelFrame.Size -- Update original size from created UI
 
 -- Connect Death Handler
@@ -988,13 +1062,13 @@ RunService.RenderStepped:Connect(function(deltaTime)
             if char then
                  local pickaxe = char:FindFirstChild("Pickaxe")
                  if not pickaxe then
-                    print("Pickaxe not equipped (fallback check). Pressing '1' to equip.")
-                    pcall(function()
-                        local VirtualInputManager = game:GetService("VirtualInputManager")
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-                    end)
+                     print("Pickaxe not equipped (fallback check). Pressing '1' to equip.")
+                     pcall(function()
+                         local VirtualInputManager = game:GetService("VirtualInputManager")
+                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                         task.wait(0.1)
+                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                     end)
                  end
             else
                 warn("Pickaxe check: Could not find player model.")
@@ -1115,8 +1189,8 @@ UIElements.WalkToKealohaButton.MouseButton1Click:Connect(walkToKealoha)
 UIElements.SellLoopButton.MouseButton1Click:Connect(function() toggleSellLoop(UIElements.SellLoopButton) end)
 -- [NEW] Connect the blue label button
 UIElements.BlueLabelButton.MouseButton1Click:Connect(function() 
-    print("Moving to Blue Label location...")
-    teleportTo(Vector3.new(1936, 15, 2285))
+    print("Moving to ATM location...")
+    teleportTo(Vector3.new(2922, 23, 2757)) -- [ CHANGED ]
 end)
 
 -- [[[[[ NEW ]]]]]
@@ -1165,8 +1239,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         toggleSellLoop(UIElements.SellLoopButton)
         
     elseif input.KeyCode == Enum.KeyCode.B then
-        print("Key B pressed: Moving to Blue Label")
-        teleportTo(Vector3.new(1936, 15, 2285))
+        print("Key B pressed: Moving to ATM") -- [ CHANGED ]
+        teleportTo(Vector3.new(2922, 23, 2757)) -- [ CHANGED ]
         
     -- [[[[[ NEW ]]]]]
     elseif input.KeyCode == Enum.KeyCode.N then
@@ -1335,11 +1409,11 @@ task.spawn(function()
             -- เราจะใช้ FindFirstChild แบบต่อกันไปเรื่อยๆ แทน WaitForChild เพื่อไม่ให้ลูปค้าง
             -- หาก UI หายไปชั่วขณะ
             return playerGui:FindFirstChild("Scoreboard")
-                           :FindFirstChild("CanvasGroup")
-                           :FindFirstChild("Frame")
-                           :FindFirstChild("Status")
-                           :FindFirstChild("Online")
-                           :FindFirstChild("TextLabel")
+                            :FindFirstChild("CanvasGroup")
+                            :FindFirstChild("Frame")
+                            :FindFirstChild("Status")
+                            :FindFirstChild("Online")
+                            :FindFirstChild("TextLabel")
         end)
 
         if success and textLabel then
@@ -1392,4 +1466,3 @@ end)
 -- Auto-start the farm loop after initial actions
 print("Auto-starting farm loop...")
 toggleOreFarmLoop(UIElements.FarmOreButton)
-
