@@ -23,7 +23,7 @@ local PathfindingService = game:GetService("PathfindingService")
 -- It works by intercepting calls to TeleportService and blocking them.
 -- =============================================
 pcall(function()
-    local TeleportService = game:GetService("TeleportService")
+    local TeleportService = game:GetService("TeleportService") -- [FIXED] Replaced non-breaking space (U+a0) with standard spaces.
     local mt = getrawmetatable(TeleportService)
     local oldIndex = mt.__index
 
@@ -455,7 +455,7 @@ local function setupCounters(counterLabels)
     
     local diamondLabel = counterLabels.diamond
     local bankDisplayLabel = counterLabels.bank -- This is OUR UI label
-    local cashDisplayLabel = counterLabels.cash   -- This is OUR UI label
+    local cashDisplayLabel = counterLabels.cash    -- This is OUR UI label
 
     -- Part 1: Diamond and Cash Attribute Counters (from inventoryFolder)
     if not inventoryFolder then 
@@ -1060,16 +1060,16 @@ RunService.RenderStepped:Connect(function(deltaTime)
             -- Fallback check using the standard Character property if not found in Workspace.Character
             local char = LocalPlayer.Character
             if char then
-                 local pickaxe = char:FindFirstChild("Pickaxe")
-                 if not pickaxe then
-                     print("Pickaxe not equipped (fallback check). Pressing '1' to equip.")
-                     pcall(function()
-                         local VirtualInputManager = game:GetService("VirtualInputManager")
-                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-                         task.wait(0.1)
-                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-                     end)
-                 end
+                local pickaxe = char:FindFirstChild("Pickaxe")
+                if not pickaxe then
+                    print("Pickaxe not equipped (fallback check). Pressing '1' to equip.")
+                    pcall(function()
+                        local VirtualInputManager = game:GetService("VirtualInputManager")
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                    end)
+                end
             else
                 warn("Pickaxe check: Could not find player model.")
             end
@@ -1303,6 +1303,72 @@ task.spawn(function()
             print("Anti-AFK action performed (Spacebar) to prevent disconnection.")
         end)
     end
+end)
+
+-- ====================================================================================
+-- [[[[[ บล็อคใหม่: ตรวจสอบไอเทมหายระหว่างฟาร์ม ]]]]]
+-- ตรวจสอบว่าไอเทมมีค่า (เช่น เพชร, ทอง, เหล็ก) ลดลงหรือไม่
+-- ในขณะที่กำลังฟาร์ม (และไม่ได้กำลังขาย)
+-- ====================================================================================
+task.spawn(function()
+    -- รอให้ inventoryFolder พร้อมใช้งาน
+    if not inventoryFolder then
+        warn("Item Loss Check: inventoryFolder not found. This feature will be disabled.")
+        return
+    end
+
+    local monitoredItemValues = {}
+    local itemsToMonitor = {
+        "Rockfragments",
+        "Soil",
+        "Iron",
+        "Copper",
+        "Gold",
+        DIAMOND_ATTRIBUTE_NAME -- "Diamond"
+    }
+
+    -- 1. ฟังก์ชันสำหรับอัปเดตค่าเริ่มต้น
+    local function updateAllMonitoredValues()
+        for _, itemName in ipairs(itemsToMonitor) do
+            monitoredItemValues[itemName] = inventoryFolder:GetAttribute(itemName) or 0
+        end
+    end
+    
+    task.wait(3) -- รอ 3 วินาทีเพื่อให้ค่า attribute เริ่มต้นโหลดเสร็จ
+    updateAllMonitoredValues()
+    print("Initialized item monitoring values.")
+    
+    -- 2. สร้าง Listener
+    inventoryFolder.AttributeChanged:Connect(function(attributeName)
+        -- ตรวจสอบว่านี่คือหนึ่งในไอเทมที่เรากำลังตรวจสอบหรือไม่
+        local isMonitored = table.find(itemsToMonitor, attributeName)
+        if not isMonitored then
+            return -- ไม่ใช่ไอเทมที่สนใจ
+        end
+
+        -- 3. ดึงค่าเก่าและค่าใหม่
+        local oldValue = monitoredItemValues[attributeName] or 0
+        local newValue = inventoryFolder:GetAttribute(attributeName) or 0
+
+        -- 4. ตรรกะการตรวจสอบหลัก
+        -- เราจะตรวจสอบเฉพาะเมื่อ:
+        -- (A) ลูปฟาร์มทำงาน (isOreFarmLoopActive)
+        -- (B) และ ลูปขาย *ไม่ได้* ทำงาน (not isSellLoopActive)
+        -- (C) และ ค่าใหม่น้อยกว่าค่าเก่า (newValue < oldValue)
+        if isOreFarmLoopActive and not isSellLoopActive and newValue < oldValue then
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("!!! ITEM LOSS DETECTED WHILE FARMING !!!")
+            print("!!! Item: " .. attributeName .. " | Old: " .. oldValue .. " | New: " .. newValue)
+            print("!!! Kicking player to prevent further loss. !!!")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            LocalPlayer:Kick("ตรวจพบไอเทมหายระหว่างฟาร์ม (Item Loss Detected)")
+        end
+
+        -- 5. อัปเดตค่าที่เก็บไว้เป็นค่าใหม่เสมอ (ไม่ว่าเงื่อนไข kick จะทำงานหรือไม่)
+        monitoredItemValues[attributeName] = newValue
+    end)
+    
+    print("Item loss detection system is active.")
 end)
 
 -- ====================================================================================
