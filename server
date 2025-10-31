@@ -98,7 +98,18 @@ while true do
 
     if serverlistUI and serverlistUI.Enabled then
         if os.clock() > lastAttemptTime + RETRY_DELAY_SECONDS and not isTeleporting then
-            print("พบ UI '"..TARGET_UI_NAME.."', เริ่มสุ่มเซิร์ฟเวอร์")
+            
+            -- [!! START EDIT !!]
+            -- นี่คือส่วนที่แก้ไขเพื่อแก้ปัญหาการเข้าหลายจอพร้อมกัน
+            -- เราจะเพิ่มการหน่วงเวลาแบบสุ่ม (1-5 วินาที)
+            -- เพื่อให้แต่ละจอ "กระจาย" เวลากันยิงคำขอ Teleport
+            -- สิ่งนี้จะช่วยลดการ "แย่ง" เซิร์ฟเวอร์ และหลีกเลี่ยงการถูก Roblox จำกัด
+            local randomDelay = math.random(1, 5) 
+            print("พบ UI '"..TARGET_UI_NAME.."', รอสุ่ม " .. randomDelay .. " วินาที ก่อนค้นหาเซิร์ฟเวอร์...")
+            task.wait(randomDelay)
+            -- [!! END EDIT !!]
+            
+            print("เริ่มสุ่มเซิร์ฟเวอร์")
             findAndTeleportToRandomServer()
         end
     else
