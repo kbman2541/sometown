@@ -49,14 +49,14 @@ local AIM_OFFSET = Vector3.new(0, 0, 0)
 local espEnabled = false -- สถานะเปิด/ปิด ESP
 
 -- ====== HELPER FUNCTION: RESOLVE CHARACTER ======
--- ฟังก์ชันแปลงเป้าหมายให้เป็น Character Model เสมอ (ไม่ว่าจะเป็น Player หรือ Model)
+-- ฟังก์ชันแปลงเป้าหมายให้เป็น Character Model เสมอ (ใช้ Logic เดียวกันทั้ง ESP และ Aimbot)
 local function resolveCharacter(target)
     if not target then return nil end
     
     if target:IsA("Model") then
         return target
     elseif target:IsA("Player") then
-        if target.Character then return target.Character end
+        if target.Character and target.Character.Parent then return target.Character end
         -- กรณีหา Character ไม่เจอ ลองหาใน Workspace
         return Workspace:FindFirstChild(target.Name)
     end
@@ -67,12 +67,14 @@ end
 local function getCharacterParts(character)
     if not character then return nil, nil end
 
+    -- หาชิ้นส่วนแกนกลาง (Root)
     local root = character:FindFirstChild("HumanoidRootPart") or 
                  character:FindFirstChild("Torso") or 
                  character:FindFirstChild("UpperTorso") or 
                  character.PrimaryPart
 
-    local head = character:FindFirstChild(AIM_PART)
+    -- หาหัว (Head) - ถ้าไม่มีให้ใช้ Root แทนชั่วคราวเพื่อให้ ESP ติด แต่อาจเล็งผิดจุดเล็กน้อย
+    local head = character:FindFirstChild(AIM_PART) or root
     
     return root, head
 end
@@ -341,66 +343,114 @@ task.spawn(function()
     end
 end)
 
--- ====== ESP FUNCTION ======
-local function refreshESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local char = resolveCharacter(player)
-            if char then
-                if espEnabled then
-                    -- 1. สร้าง Highlight (ตัวสีฟ้า)
-                    if not char:FindFirstChild("AKB_Highlight") then
-                        local hl = Instance.new("Highlight")
-                        hl.Name = "AKB_Highlight"
-                        hl.FillColor = fantasyColors.AKBBlue -- สีฟ้า
-                        hl.OutlineColor = Color3.new(1, 1, 1) -- ขอบขาว
-                        hl.FillTransparency = 0.5 -- ความโปร่งแสง
-                        hl.OutlineTransparency = 0
-                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- มองทะลุกำแพง
-                        hl.Parent = char
+-- ====== ESP MANAGER SYSTEM ======
+-- ฟังก์ชันเพิ่ม Visuals (Highlight + NameTag)
+local function applyESP(character, player)
+    if not character then return end
+    
+    -- ลบอันเก่าก่อนเสมอเพื่อป้องกันการซ้อนทับ
+    local oldHl = character:FindFirstChild("AKB_Highlight")
+    if oldHl then oldHl:Destroy() end
+    
+    local head = character:FindFirstChild("Head")
+    if head then
+        local oldTag = head:FindFirstChild("AKB_NameTag")
+        if oldTag then oldTag:Destroy() end
+    end
+    
+    -- ถ้าปิด ESP อยู่ ให้ออกจากฟังก์ชัน (ถือว่าเป็นการลบแล้ว)
+    if not espEnabled then return end
+
+    -- สร้าง Highlight ใหม่
+    local hl = Instance.new("Highlight")
+    hl.Name = "AKB_Highlight"
+    hl.FillColor = fantasyColors.AKBBlue -- สีฟ้า
+    hl.OutlineColor = Color3.new(1, 1, 1) -- ขอบขาว
+    hl.FillTransparency = 0.5 -- ความโปร่งแสง
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- มองทะลุกำแพง
+    hl.Parent = character
+
+    -- สร้าง NameTag ใหม่
+    if head then
+        local bg = Instance.new("BillboardGui")
+        bg.Name = "AKB_NameTag"
+        bg.Adornee = head
+        bg.Size = UDim2.new(0, 200, 0, 50)
+        bg.StudsOffset = Vector3.new(0, 3.5, 0) -- ลอยเหนือหัว
+        bg.AlwaysOnTop = true
+        bg.Parent = head
+        
+        local text = Instance.new("TextLabel", bg)
+        text.Size = UDim2.new(1, 0, 1, 0)
+        text.BackgroundTransparency = 1
+        text.Text = player.Name
+        text.TextColor3 = fantasyColors.AKBBlue -- ชื่อสีฟ้า
+        text.TextStrokeTransparency = 0
+        text.Font = Enum.Font.GothamBold
+        text.TextSize = 14
+    end
+end
+
+-- ฟังก์ชันจัดการเมื่อตัวละครเกิด
+local function onCharacterAdded(player, char)
+    -- รอให้ตัวละครโหลดเสร็จสักครู่
+    task.wait(0.5)
+    if char and char.Parent then
+        applyESP(char, player)
+    end
+end
+
+-- ฟังก์ชันตั้งค่าผู้เล่น (ทั้งเก่าและใหม่)
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+    
+    -- 1. จัดการตัวละครที่มีอยู่แล้ว (สำหรับคนเก่า)
+    if player.Character then
+        onCharacterAdded(player, player.Character)
+    end
+    
+    -- 2. ดักรอตัวละครเกิดใหม่ (สำหรับคนตายเกิดใหม่ หรือเพิ่งเข้า)
+    player.CharacterAdded:Connect(function(char)
+        onCharacterAdded(player, char)
+    end)
+end
+
+-- เริ่มระบบจัดการผู้เล่น
+for _, p in ipairs(Players:GetPlayers()) do
+    setupPlayer(p)
+end
+Players.PlayerAdded:Connect(setupPlayer)
+
+-- Loop ESP (Backup)
+task.spawn(function()
+    while true do
+        if espEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local char = resolveCharacter(player)
+                    if char and char.Parent then
+                        if not char:FindFirstChild("AKB_Highlight") then
+                            applyESP(char, player)
+                        end
                     end
-                    
-                    -- 2. สร้าง NameTag (ชื่อบนหัว)
-                    local head = char:FindFirstChild("Head")
-                    if head and not head:FindFirstChild("AKB_NameTag") then
-                        local bg = Instance.new("BillboardGui")
-                        bg.Name = "AKB_NameTag"
-                        bg.Adornee = head
-                        bg.Size = UDim2.new(0, 200, 0, 50)
-                        bg.StudsOffset = Vector3.new(0, 3.5, 0) -- ลอยเหนือหัว
-                        bg.AlwaysOnTop = true
-                        bg.Parent = head
-                        
-                        local text = Instance.new("TextLabel", bg)
-                        text.Size = UDim2.new(1, 0, 1, 0)
-                        text.BackgroundTransparency = 1
-                        text.Text = player.Name
-                        text.TextColor3 = fantasyColors.AKBBlue -- ชื่อสีฟ้า
-                        text.TextStrokeTransparency = 0
-                        text.Font = Enum.Font.GothamBold
-                        text.TextSize = 14
-                    end
-                else
-                    -- ลบ ESP ถ้าปิดใช้งาน
+                end
+            end
+        else
+            for _, player in ipairs(Players:GetPlayers()) do
+                local char = resolveCharacter(player)
+                if char then
                     local hl = char:FindFirstChild("AKB_Highlight")
                     if hl then hl:Destroy() end
-                    
                     local head = char:FindFirstChild("Head")
                     if head then
-                        local bg = head:FindFirstChild("AKB_NameTag")
-                        if bg then bg:Destroy() end
+                        local tag = head:FindFirstChild("AKB_NameTag")
+                        if tag then tag:Destroy() end
                     end
                 end
             end
         end
-    end
-end
-
--- Loop ESP (ทำงานตลอดเวลาเพื่อเช็คผู้เล่นใหม่)
-task.spawn(function()
-    while true do
-        refreshESP()
-        task.wait(0.5) -- อัปเดตทุก 0.5 วินาที
+        task.wait(1)
     end
 end)
 
@@ -422,63 +472,40 @@ local dummyCharacter = nil
 
 -- ====== FUNCTIONS ======
 
--- ฟังก์ชันค้นหาเป้าหมาย: 1. ดูจากหน้าจอตรงๆ (Raycast) 2. ดูระยะห่าง (Loop)
+-- ฟังก์ชันค้นหาเป้าหมายแบบ Robust (ใช้ Logic เดียวกับ ESP 100%)
 local function findTargetFromScreenAndDistance()
-    -- [1] SCREEN CAPTURE CHECK (Raycast จากกลางจอ)
-    -- ใช้ Spherecast เพื่อให้มีขนาดลำแสงหน่อย (Aim Assist แบบ Hitbox)
-    local screenCenter = camera.ViewportSize / 2
-    local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
-    
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    if LocalPlayer.Character then
-        params.FilterDescendantsInstances = {LocalPlayer.Character}
-    end
-    
-    -- ยิง Spherecast ขนาด 2 studs ไปข้างหน้า 1000 หน่วย
-    local castResult = Workspace:Spherecast(ray.Origin, 2, ray.Direction * AIM_DISTANCE, params)
-    
-    if castResult and castResult.Instance then
-        local model = castResult.Instance:FindFirstAncestorOfClass("Model")
-        if model then
-            -- เช็คว่าเป็นตัวละครหรือไม่ (มี Humanoid และเลือด > 0)
-            local humanoid = model:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                -- เช็ค Ignore List (ต้องแปลง Model กลับเป็น Player เพื่อเช็ค)
-                local player = Players:GetPlayerFromCharacter(model)
-                if not (player and ignoredPlayers[player]) then
-                    return model -- *** เจอตัวจากการมองจอโดยตรง ล็อคเลย ***
-                end
-            end
-        end
-    end
-
-    -- [2] DISTANCE CHECK (Fallback ถ้าไม่ได้มองใครตรงๆ)
     local closestTarget = nil
     local shortestDistance = math.huge
     local maxDistance = AIM_DISTANCE
 
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
 
+    -- วนลูปหาทุกคนในเซิร์ฟเวอร์
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             if ignoredPlayers[player] then continue end
 
+            -- 1. ใช้ resolveCharacter เหมือน ESP เป๊ะๆ
             local targetChar = resolveCharacter(player)
+            
+            -- 2. ดึงชิ้นส่วน Head (ถ้าไม่มี Head ใช้ Root)
             local rootPart, targetPart = getCharacterParts(targetChar)
 
             if rootPart and targetPart then
+                -- เช็คระยะห่างจริง (World Distance)
                 local distanceToPlayer = (rootPart.Position - camera.CFrame.Position).Magnitude
                 
                 if distanceToPlayer <= maxDistance then
+                    -- เช็คว่าอยู่ในจอไหม (Screen Check)
                     local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
                     
                     if onScreen then
+                        -- หาคนที่ใกล้เป้าที่สุด (Distance from Crosshair)
                         local distanceToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                         
                         if distanceToCenter < shortestDistance then
                             shortestDistance = distanceToCenter
-                            closestTarget = targetChar -- ส่งกลับเป็น Model
+                            closestTarget = targetChar -- ล็อคตัวละครนี้
                         end
                     end
                 end
@@ -498,11 +525,9 @@ local function updateFreeCam(deltaTime)
         humanoid.JumpHeight = 0
     end
     
-    -- ควบคุมมุมกล้อง
     if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not aimAssistEnabled then 
         UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
         local delta = UserInputService:GetMouseDelta()
-        
         currentYaw = currentYaw - delta.X * mouseSensitivity
         currentPitch = currentPitch - delta.Y * mouseSensitivity
         currentPitch = math.clamp(currentPitch, -math.pi/2.01, math.pi/2.01) 
@@ -512,7 +537,6 @@ local function updateFreeCam(deltaTime)
     
     local rotationCFrame = CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(currentPitch, 0, 0)
     
-    -- การเคลื่อนที่ (WASD + Q/E)
     local moveVector = Vector3.new(0, 0, 0)
     if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += Vector3.new(0, 0, -1) end
     if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector += Vector3.new(0, 0, 1) end
@@ -550,7 +574,6 @@ local function disableFreeCam()
     end
     
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    
     if dummyCharacter then
         dummyCharacter:Destroy()
         dummyCharacter = nil
@@ -583,14 +606,12 @@ local function enableFreeCam()
         humanoid.JumpHeight = 0
     end
     
-    -- สร้างร่างปลอมไว้ที่ตำแหน่งเดิม
     if char then
         pcall(function()
             dummyCharacter = char:Clone()
             dummyCharacter.Name = "FreeCamDummy"
             dummyCharacter:SetPrimaryPartCFrame(char:GetPrimaryPartCFrame())
             dummyCharacter.Parent = Workspace
-            
             for _, part in ipairs(dummyCharacter:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.Anchored = true
@@ -615,9 +636,8 @@ end
 
 -- ====== INPUT HANDLING ======
 UserInputService.InputBegan:Connect(function(input, processed)
-    -- คลิกขวาเพื่อเล็งเป้า
     if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
-        -- ใช้ฟังก์ชันใหม่ที่หาจากหน้าจอ + ระยะทาง
+        -- หาเป้าหมายด้วยวิธีที่เสถียรที่สุด (Screen Distance)
         local target = findTargetFromScreenAndDistance()
         if target then
             aimTarget = target
@@ -629,23 +649,25 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
     if processed then return end 
 
-    -- Toggle Aim Assist (กด Y)
     if input.KeyCode == Enum.KeyCode.Y then
         aimAssistEnabled = not aimAssistEnabled
         crosshairFrame.Visible = aimAssistEnabled
-        
         if not aimAssistEnabled then
             aimTarget = nil
             headMarker.Enabled = false
         end
     end
 
-    -- Toggle ESP (กด L)
     if input.KeyCode == Enum.KeyCode.L then
         espEnabled = not espEnabled
+        if espEnabled then
+            for _, p in ipairs(Players:GetPlayers()) do
+                local c = resolveCharacter(p)
+                if c then applyESP(c, p) end
+            end
+        end
     end
 
-    -- Toggle Player List (กด U)
     if input.KeyCode == Enum.KeyCode.U then
         playerListFrame.Visible = not playerListFrame.Visible
         if playerListFrame.Visible then
@@ -653,12 +675,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
     end
     
-    -- Toggle Offset Adjuster (กด O)
     if input.KeyCode == Enum.KeyCode.O then
         offsetFrame.Visible = not offsetFrame.Visible
     end
 
-    -- Toggle Free Cam (กด Right Shift)
     if input.KeyCode == Enum.KeyCode.RightShift then
         if isFreeCamActive then
             disableFreeCam()
@@ -667,7 +687,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
     end
 
-    -- Teleport to Camera (กด T ในโหมด Free Cam)
     if isFreeCamActive and input.KeyCode == Enum.KeyCode.T then
         onTeleportToCam()
     end
@@ -681,25 +700,24 @@ UserInputService.InputEnded:Connect(function(input, processed)
     end
 end)
 
--- Aim Loop (ลูปการทำงานของการล็อคเป้า)
+-- Aim Loop
 local function updateAimLock()
     if aimAssistEnabled and aimTarget then
         -- แปลง aimTarget เป็น Character Model เสมอ
         local charModel = resolveCharacter(aimTarget)
+        
+        -- ใช้ Head เสมอ ถ้าไม่มี Head ใช้ Root แทน (เหมือน ESP)
         local _, headPart = getCharacterParts(charModel)
         
-        -- ตรวจสอบว่าต้องไม่เป็นผู้เล่นที่ Ignore ไว้
         local player = Players:GetPlayerFromCharacter(charModel)
         local isIgnored = player and ignoredPlayers[player]
         
         if headPart and not isIgnored then
-            -- 1. ล๊อคกล้องไปที่เป้าหมาย + Offset
             local targetPos = headPart.Position + AIM_OFFSET
             camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
             
-            -- 2. แสดงจุดแดงที่ตำแหน่ง Offset จริง (ใช้ StudsOffsetWorldSpace)
             headMarker.Adornee = headPart
-            headMarker.StudsOffsetWorldSpace = AIM_OFFSET -- ย้ายจุดแดงไปที่จุดเล็งจริง
+            headMarker.StudsOffsetWorldSpace = AIM_OFFSET
             headMarker.Enabled = true
         else
             aimTarget = nil
