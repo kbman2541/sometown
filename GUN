@@ -84,7 +84,7 @@ task.spawn(function()
     local introLabel = Instance.new("TextLabel")
     introLabel.Name = "AKB_Intro"
     introLabel.Size = UDim2.new(1, 0, 1, 0)
-    introLabel.Position = UDim2.new(0, 0, 0, 0)
+    introLabel.Position = UDim2.new(0, 0, 0, -20) -- ขยับขึ้นนิดหน่อย
     introLabel.BackgroundTransparency = 1
     introLabel.Text = "AKB"
     introLabel.TextColor3 = fantasyColors.AKBBlue
@@ -97,17 +97,33 @@ task.spawn(function()
     stroke.Parent = introLabel
     stroke.Thickness = 3
     stroke.Transparency = 0
+
+    -- [NEW] Version Label แสดงเวอร์ชั่นที่แก้
+    local versionLabel = Instance.new("TextLabel")
+    versionLabel.Name = "AKB_Version"
+    versionLabel.Size = UDim2.new(1, 0, 0, 30)
+    versionLabel.Position = UDim2.new(0, 0, 0.5, 40) -- อยู่ใต้ AKB
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Text = "Version: ESP + Hybrid Lock Fix" -- ข้อความเวอร์ชั่น
+    versionLabel.TextColor3 = fantasyColors.Highlight
+    versionLabel.TextSize = 24
+    versionLabel.Font = Enum.Font.Gotham
+    versionLabel.TextTransparency = 0
+    versionLabel.Parent = screenGui
     
     task.wait(2)
     local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local tween = TweenService:Create(introLabel, tweenInfo, {TextTransparency = 1})
     local strokeTween = TweenService:Create(stroke, tweenInfo, {Transparency = 1})
+    local versionTween = TweenService:Create(versionLabel, tweenInfo, {TextTransparency = 1})
     
     tween:Play()
     strokeTween:Play()
+    versionTween:Play()
     
     tween.Completed:Connect(function()
         introLabel:Destroy()
+        versionLabel:Destroy()
     end)
 end)
 
