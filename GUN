@@ -42,7 +42,6 @@ local AIM_DISTANCE = 200
 local ignoredPlayers = {}
 
 local AIM_PART = "Head" 
--- ค่าเริ่มต้น (จะถูกทับด้วยค่าจาก Slider)
 local AIM_OFFSET = Vector3.new(0, 0, 0) 
 
 -- ====== INTRO SEQUENCE (AKB) ======
@@ -77,7 +76,7 @@ task.spawn(function()
     end)
 end)
 
--- ====== OFFSET ADJUSTER UI (NEW) ======
+-- ====== OFFSET ADJUSTER UI ======
 local offsetFrame = Instance.new("Frame")
 offsetFrame.Name = "OffsetAdjuster"
 offsetFrame.Size = UDim2.new(0, 200, 0, 160)
@@ -118,12 +117,11 @@ local function createSlider(name, yPos, axisChar, defaultVal)
     local sliderBtn = Instance.new("TextButton", sliderBg)
     sliderBtn.Size = UDim2.new(0, 12, 0, 12)
     sliderBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-    sliderBtn.Position = UDim2.new(0.5, 0, 0.5, 0) -- Start at center (0)
+    sliderBtn.Position = UDim2.new(0.5, 0, 0.5, 0)
     sliderBtn.BackgroundColor3 = fantasyColors.AKBBlue
     sliderBtn.Text = ""
     Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(1, 0)
 
-    -- Logic การเลื่อน
     local isDragging = false
     local minVal, maxVal = -5, 5
 
@@ -142,11 +140,11 @@ local function createSlider(name, yPos, axisChar, defaultVal)
             sliderBtn.Position = UDim2.new(relativePos, 0, 0.5, 0)
             
             local actualValue = minVal + (relativePos * (maxVal - minVal))
-            actualValue = math.floor(actualValue * 10) / 10 -- ทศนิยม 1 ตำแหน่ง
+            actualValue = math.floor(actualValue * 10) / 10
             
             label.Text = axisChar .. ": " .. actualValue
             
-            -- อัปเดตค่า AIM_OFFSET
+            -- อัปเดตค่า Offset
             local currentX = AIM_OFFSET.X
             local currentY = AIM_OFFSET.Y
             local currentZ = AIM_OFFSET.Z
@@ -159,7 +157,6 @@ local function createSlider(name, yPos, axisChar, defaultVal)
         end
     end)
     
-    -- Set default position (0 is at 0.5)
     local startAlpha = (defaultVal - minVal) / (maxVal - minVal)
     sliderBtn.Position = UDim2.new(startAlpha, 0, 0.5, 0)
 end
@@ -167,6 +164,22 @@ end
 createSlider("SliderX", 30, "X", 0)
 createSlider("SliderY", 70, "Y", 0)
 createSlider("SliderZ", 110, "Z", 0)
+
+-- ====== VISUALS (HEAD MARKER) ======
+-- Marker นี้จะติดที่หัวจริง เพื่อเทียบกับเป้าว่าห่างกันแค่ไหน
+local headMarker = Instance.new("BillboardGui")
+headMarker.Name = "HeadMarker"
+headMarker.Adornee = nil
+headMarker.Size = UDim2.new(0, 10, 0, 10)
+headMarker.AlwaysOnTop = true
+headMarker.Enabled = false
+headMarker.Parent = screenGui
+
+local headDot = Instance.new("Frame", headMarker)
+headDot.Size = UDim2.new(1, 0, 1, 0)
+headDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- สีแดง
+headDot.BorderSizePixel = 0
+Instance.new("UICorner", headDot).CornerRadius = UDim.new(1, 0)
 
 -- ====== CROSSHAIR UI ======
 local crosshairFrame = Instance.new("Frame")
@@ -180,7 +193,6 @@ crosshairFrame.Visible = false
 crosshairFrame.Parent = screenGui
 Instance.new("UICorner", crosshairFrame).CornerRadius = UDim.new(1, 0)
 
--- ซ่อน Text AimStatus
 local aimStatusLabel = Instance.new("TextLabel")
 aimStatusLabel.Name = "AimStatus"
 aimStatusLabel.Visible = false
@@ -483,6 +495,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
         
         if not aimAssistEnabled then
             aimTarget = nil
+            headMarker.Enabled = false
         end
     end
 
@@ -493,7 +506,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
     end
     
-    -- [NEW] Toggle Offset Menu (O)
     if input.KeyCode == Enum.KeyCode.O then
         offsetFrame.Visible = not offsetFrame.Visible
     end
@@ -515,6 +527,7 @@ UserInputService.InputEnded:Connect(function(input, processed)
     if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
         aimTarget = nil
         crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+        headMarker.Enabled = false
     end
 end)
 
@@ -522,12 +535,20 @@ end)
 local function updateAimLock()
     if aimAssistEnabled and aimTarget then
         if aimTarget.Character and aimTarget.Character:FindFirstChild(AIM_PART) and not ignoredPlayers[aimTarget] then
+            -- 1. ล๊อคเป้า
             local targetPos = aimTarget.Character[AIM_PART].Position + AIM_OFFSET
             camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
+            
+            -- 2. แสดงจุดแดงที่หัวจริง (เพื่อเปรียบเทียบกับเป้าเขียว)
+            headMarker.Adornee = aimTarget.Character[AIM_PART]
+            headMarker.Enabled = true
         else
             aimTarget = nil
             crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+            headMarker.Enabled = false
         end
+    else
+        headMarker.Enabled = false
     end
 end
 
