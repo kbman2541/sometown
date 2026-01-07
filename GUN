@@ -38,7 +38,7 @@ local fantasyColors = {
 -- ====== AIM CONFIG (ตั้งค่าการเล็ง) ======
 local aimAssistEnabled = false
 local aimTarget = nil
-local AIM_DISTANCE = 200 
+local AIM_DISTANCE = 1000 -- [UPDATED] ปรับระยะเป็น 1000 ตามคำขอ
 local ignoredPlayers = {}
 
 local AIM_PART = "Head" 
@@ -166,7 +166,6 @@ createSlider("SliderY", 70, "Y", 0)
 createSlider("SliderZ", 110, "Z", 0)
 
 -- ====== VISUALS (HEAD MARKER) ======
--- Marker นี้จะติดที่หัวจริง เพื่อเทียบกับเป้าว่าห่างกันแค่ไหน
 local headMarker = Instance.new("BillboardGui")
 headMarker.Name = "HeadMarker"
 headMarker.Adornee = nil
@@ -213,7 +212,7 @@ Instance.new("UIStroke", playerListFrame).Color = fantasyColors.Highlight
 local listTitle = Instance.new("TextLabel", playerListFrame)
 listTitle.Size = UDim2.new(1, 0, 0, 30)
 listTitle.BackgroundColor3 = fantasyColors.Primary
-listTitle.Text = "รายชื่อผู้เล่น (300ม.)"
+listTitle.Text = "รายชื่อผู้เล่น (1000ม.)" -- [UPDATED] แก้ไขข้อความระยะ
 listTitle.TextColor3 = fantasyColors.TextGold
 listTitle.Font = Enum.Font.Garamond
 listTitle.TextSize = 18
@@ -539,8 +538,9 @@ local function updateAimLock()
             local targetPos = aimTarget.Character[AIM_PART].Position + AIM_OFFSET
             camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
             
-            -- 2. แสดงจุดแดงที่หัวจริง (เพื่อเปรียบเทียบกับเป้าเขียว)
+            -- 2. แสดงจุดแดง [UPDATED] ใช้ StudsOffsetWorldSpace เพื่อเลื่อนจุดแดงไปตาม Offset ที่ตั้งไว้
             headMarker.Adornee = aimTarget.Character[AIM_PART]
+            headMarker.StudsOffsetWorldSpace = AIM_OFFSET -- ย้ายจุดแดงไปที่จุดเล็งจริง
             headMarker.Enabled = true
         else
             aimTarget = nil
