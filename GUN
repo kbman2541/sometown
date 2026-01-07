@@ -1,0 +1,445 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = Workspace.CurrentCamera
+
+-- ====== CLEANUP OLD UI ======
+for _, uiName in ipairs({"AKB_MasterUI", "AKB_CombinedUI", "FantasyFarmGUI", "PlayerTeleportGui"}) do
+    pcall(function()
+        local ui = PlayerGui:FindFirstChild(uiName)
+        if ui then ui:Destroy() end
+    end)
+end
+
+-- ====== VARIABLES ======
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AKB_MasterUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = PlayerGui
+
+local fantasyColors = {
+    Background = Color3.fromRGB(25, 20, 40),
+    Primary = Color3.fromRGB(45, 35, 70),
+    Secondary = Color3.fromRGB(0, 150, 160),
+    Highlight = Color3.fromRGB(255, 220, 100),
+    Text = Color3.fromRGB(240, 230, 255),
+    TextGold = Color3.fromRGB(255, 235, 170),
+    AimTarget = Color3.fromRGB(255, 50, 50),
+    Ignore = Color3.fromRGB(255, 100, 100),
+    AKBBlue = Color3.fromRGB(0, 255, 255) -- สีฟ้าสำหรับ AKB
+}
+
+-- ====== INTRO SEQUENCE (AKB) ======
+task.spawn(function()
+    local introLabel = Instance.new("TextLabel")
+    introLabel.Name = "AKB_Intro"
+    introLabel.Size = UDim2.new(1, 0, 1, 0)
+    introLabel.Position = UDim2.new(0, 0, 0, 0)
+    introLabel.BackgroundTransparency = 1
+    introLabel.Text = "AKB"
+    introLabel.TextColor3 = fantasyColors.AKBBlue
+    introLabel.TextSize = 100
+    introLabel.Font = Enum.Font.GothamBold
+    introLabel.TextTransparency = 0
+    introLabel.Parent = screenGui
+    
+    -- เพิ่ม Stroke ให้ตัวหนังสือชัดขึ้น
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = introLabel
+    stroke.Thickness = 3
+    stroke.Transparency = 0
+    
+    -- รอ 3 วินาทีแล้วค่อยๆ จางหายไป
+    task.wait(2) -- แสดงผลเต็มที่ 2 วิ
+    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(introLabel, tweenInfo, {TextTransparency = 1})
+    local strokeTween = TweenService:Create(stroke, tweenInfo, {Transparency = 1})
+    
+    tween:Play()
+    strokeTween:Play()
+    
+    tween.Completed:Connect(function()
+        introLabel:Destroy()
+    end)
+end)
+
+-- ====== AIM ASSIST VARIABLES ======
+local aimAssistEnabled = false -- เริ่มต้นปิดไว้ กด Y เพื่อเปิด
+local aimTarget = nil
+local AIM_DISTANCE = 200 -- ปรับระยะเป็น 200 ตามที่ขอ
+local ignoredPlayers = {}
+
+-- ====== CROSSHAIR UI ======
+local crosshairFrame = Instance.new("Frame")
+crosshairFrame.Name = "Crosshair"
+crosshairFrame.Size = UDim2.new(0, 6, 0, 6)
+crosshairFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+crosshairFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+crosshairFrame.BorderSizePixel = 0
+crosshairFrame.Visible = false
+crosshairFrame.Parent = screenGui
+Instance.new("UICorner", crosshairFrame).CornerRadius = UDim.new(1, 0)
+
+-- [EDITED] ซ่อน Text ตรงกลางจอถาวร (แต่ยังเก็บตัวแปรไว้กัน Error)
+local aimStatusLabel = Instance.new("TextLabel")
+aimStatusLabel.Name = "AimStatus"
+aimStatusLabel.Visible = false -- ซ่อนไว้ตลอดเวลา
+aimStatusLabel.Parent = screenGui
+
+-- ====== PLAYER LIST UI ======
+local playerListFrame = Instance.new("Frame")
+playerListFrame.Name = "PlayerListFrame"
+playerListFrame.Size = UDim2.new(0, 220, 0, 300)
+playerListFrame.Position = UDim2.new(0, 10, 0.5, -150)
+playerListFrame.BackgroundColor3 = fantasyColors.Background
+playerListFrame.BorderSizePixel = 0
+playerListFrame.Visible = false
+playerListFrame.Parent = screenGui
+Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", playerListFrame).Color = fantasyColors.Highlight
+
+local listTitle = Instance.new("TextLabel", playerListFrame)
+listTitle.Size = UDim2.new(1, 0, 0, 30)
+listTitle.BackgroundColor3 = fantasyColors.Primary
+listTitle.Text = "รายชื่อผู้เล่น (300ม.)"
+listTitle.TextColor3 = fantasyColors.TextGold
+listTitle.Font = Enum.Font.Garamond
+listTitle.TextSize = 18
+Instance.new("UICorner", listTitle).CornerRadius = UDim.new(0, 8)
+
+local scrollingList = Instance.new("ScrollingFrame", playerListFrame)
+scrollingList.Name = "ScrollingList"
+scrollingList.Size = UDim2.new(1, -10, 1, -40)
+scrollingList.Position = UDim2.new(0, 5, 0, 35)
+scrollingList.BackgroundTransparency = 1
+scrollingList.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollingList.ScrollBarThickness = 6
+scrollingList.Parent = playerListFrame
+
+local listLayout = Instance.new("UIListLayout", scrollingList)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 5)
+
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scrollingList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+end)
+
+-- Function to refresh player list
+local function refreshPlayerList()
+    for _, child in ipairs(scrollingList:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (player.Character.HumanoidRootPart.Position - myRoot.Position).Magnitude
+            if dist <= AIM_DISTANCE then
+                local entry = Instance.new("Frame")
+                entry.Size = UDim2.new(1, -6, 0, 30)
+                entry.BackgroundColor3 = fantasyColors.Primary
+                entry.Parent = scrollingList
+                Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 4)
+
+                local nameLabel = Instance.new("TextLabel", entry)
+                nameLabel.Size = UDim2.new(0, 140, 1, 0)
+                nameLabel.Position = UDim2.new(0, 5, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = player.Name .. "\n(" .. math.floor(dist) .. "m)"
+                nameLabel.TextColor3 = fantasyColors.Text
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.TextSize = 12
+
+                local ignoreBtn = Instance.new("TextButton", entry)
+                ignoreBtn.Size = UDim2.new(0, 24, 0, 24)
+                ignoreBtn.Position = UDim2.new(1, -28, 0, 3)
+                ignoreBtn.BackgroundColor3 = ignoredPlayers[player] and fantasyColors.Ignore or fantasyColors.Secondary
+                ignoreBtn.Text = ignoredPlayers[player] and "✓" or ""
+                ignoreBtn.TextColor3 = Color3.new(1,1,1)
+                ignoreBtn.Font = Enum.Font.GothamBold
+                Instance.new("UICorner", ignoreBtn).CornerRadius = UDim.new(0, 4)
+                
+                ignoreBtn.MouseButton1Click:Connect(function()
+                    if ignoredPlayers[player] then
+                        ignoredPlayers[player] = nil
+                        ignoreBtn.BackgroundColor3 = fantasyColors.Secondary
+                        ignoreBtn.Text = ""
+                    else
+                        ignoredPlayers[player] = true
+                        ignoreBtn.BackgroundColor3 = fantasyColors.Ignore
+                        ignoreBtn.Text = "✓"
+                        if aimTarget == player then
+                            aimTarget = nil
+                            crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if playerListFrame.Visible then
+            refreshPlayerList()
+        end
+        task.wait(1)
+    end
+end)
+
+-- ====== FREE CAM VARIABLES ======
+local camera = Workspace.CurrentCamera
+local isFreeCamActive = false
+
+local mouseSensitivity = 0.05
+local moveSpeed = 50
+local shiftSpeedMultiplier = 5
+
+local currentCamPosition = Vector3.new() 
+local currentYaw = 0
+local currentPitch = 0
+
+local originalWalkSpeed = 16
+local originalJumpHeight = 7.2
+local dummyCharacter = nil
+
+-- ====== FUNCTIONS ======
+
+local function getClosestPlayerToCrosshair()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local maxDistance = AIM_DISTANCE
+
+    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
+            if ignoredPlayers[player] then continue end
+
+            local head = player.Character.Head
+            local root = player.Character.HumanoidRootPart
+            
+            local distanceToPlayer = (root.Position - camera.CFrame.Position).Magnitude
+            
+            if distanceToPlayer <= maxDistance then
+                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local distanceToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    
+                    if distanceToCenter < shortestDistance then
+                        shortestDistance = distanceToCenter
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function updateFreeCam(deltaTime)
+    if not isFreeCamActive then return end
+    
+    local char = LocalPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = 0
+        humanoid.JumpHeight = 0
+    end
+    
+    -- แก้ไข: ถ้า AimAssist ทำงานอยู่ FreeCam จะไม่หมุนจอด้วยคลิกขวา
+    if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not aimAssistEnabled then 
+        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        local delta = UserInputService:GetMouseDelta()
+        
+        currentYaw = currentYaw - delta.X * mouseSensitivity
+        currentPitch = currentPitch - delta.Y * mouseSensitivity
+        currentPitch = math.clamp(currentPitch, -math.pi/2.01, math.pi/2.01) 
+    else
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+    
+    local rotationCFrame = CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(currentPitch, 0, 0)
+    
+    local moveVector = Vector3.new(0, 0, 0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += Vector3.new(0, 0, -1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector += Vector3.new(0, 0, 1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector += Vector3.new(-1, 0, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += Vector3.new(1, 0, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.E) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVector += Vector3.new(0, 1, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVector += Vector3.new(0, -1, 0) end
+    
+    local currentSpeed = moveSpeed
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+        currentSpeed = currentSpeed * shiftSpeedMultiplier
+    end
+    
+    if moveVector.Magnitude > 0 then
+        moveVector = moveVector.Unit
+    end
+    
+    local move = (rotationCFrame.LookVector * -moveVector.Z + rotationCFrame.RightVector * moveVector.X + Vector3.yAxis * moveVector.Y) * currentSpeed * deltaTime
+    currentCamPosition = currentCamPosition + move
+    
+    camera.CFrame = CFrame.new(currentCamPosition) * rotationCFrame
+end
+
+local function disableFreeCam()
+    isFreeCamActive = false
+    RunService:UnbindFromRenderStep("FreeCamUpdate")
+    camera.CameraType = Enum.CameraType.Custom
+    local char = LocalPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+
+    if humanoid then
+        humanoid.WalkSpeed = originalWalkSpeed
+        humanoid.JumpHeight = originalJumpHeight
+        camera.CameraSubject = humanoid
+    end
+    
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    if dummyCharacter then
+        dummyCharacter:Destroy()
+        dummyCharacter = nil
+    end
+end
+
+local function enableFreeCam()
+    if aimAssistEnabled then
+        aimAssistEnabled = false
+        crosshairFrame.Visible = false
+        -- aimStatusLabel.Visible = false -- ซ่อนถาวรแล้ว
+        aimTarget = nil
+    end
+
+    isFreeCamActive = true
+    currentCamPosition = camera.CFrame.Position
+    local look = camera.CFrame.LookVector
+    currentYaw = math.atan2(look.X, -look.Z) 
+    currentPitch = math.asin(look.Y) 
+    
+    camera.CameraType = Enum.CameraType.Scriptable
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    local char = LocalPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if humanoid then
+        originalWalkSpeed = humanoid.WalkSpeed
+        originalJumpHeight = humanoid.JumpHeight
+        humanoid.WalkSpeed = 0
+        humanoid.JumpHeight = 0
+    end
+    
+    if char then
+        pcall(function()
+            dummyCharacter = char:Clone()
+            dummyCharacter.Name = "FreeCamDummy"
+            dummyCharacter:SetPrimaryPartCFrame(char:GetPrimaryPartCFrame())
+            dummyCharacter.Parent = Workspace
+            
+            for _, part in ipairs(dummyCharacter:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Anchored = true
+                    part.CanCollide = false
+                    part.Transparency = 0.7
+                end
+            end
+        end)
+    end
+    
+    RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Last.Value, updateFreeCam)
+end
+
+local function onTeleportToCam()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        local finalCFrame = CFrame.new(currentCamPosition) * CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(currentPitch, 0, 0)
+        root.CFrame = finalCFrame
+    end
+    disableFreeCam()
+end
+
+-- ====== INPUT HANDLING ======
+UserInputService.InputBegan:Connect(function(input, processed)
+    -- [MOVED & FIXED] ย้ายมาเช็คก่อน processed เพื่อให้คลิกขวาทำงานได้แม้เกมจะใช้เมาส์อยู่
+    if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local target = getClosestPlayerToCrosshair()
+        if target then
+            aimTarget = target
+            crosshairFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+        end
+    end
+
+    if processed then return end 
+
+    -- Toggle Aim System (Y)
+    if input.KeyCode == Enum.KeyCode.Y then
+        aimAssistEnabled = not aimAssistEnabled
+        crosshairFrame.Visible = aimAssistEnabled
+        -- aimStatusLabel.Visible = aimAssistEnabled -- ปิดการแสดงผล
+        
+        if not aimAssistEnabled then
+            aimTarget = nil
+        end
+    end
+
+    -- Toggle Player List (U)
+    if input.KeyCode == Enum.KeyCode.U then
+        playerListFrame.Visible = not playerListFrame.Visible
+        if playerListFrame.Visible then
+            refreshPlayerList()
+        end
+    end
+
+    -- Toggle Free Cam (Right Shift)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if isFreeCamActive then
+            disableFreeCam()
+        else
+            enableFreeCam()
+        end
+    end
+
+    if isFreeCamActive and input.KeyCode == Enum.KeyCode.T then
+        onTeleportToCam()
+    end
+end)
+
+-- [EDITED] Handle Button Release (MouseButton2 - คลิกขวา)
+UserInputService.InputEnded:Connect(function(input, processed)
+    if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aimTarget = nil
+        crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+    end
+end)
+
+-- Aim Loop
+local function updateAimLock()
+    if aimAssistEnabled and aimTarget then
+        if aimTarget.Character and aimTarget.Character:FindFirstChild("Head") and not ignoredPlayers[aimTarget] then
+            -- ใช้ Lerp เล็กน้อยเพื่อให้ดูสมูทขึ้น หรือใช้ lookAt ตรงๆ ก็ได้
+            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, aimTarget.Character.Head.Position)
+        else
+            aimTarget = nil
+            crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
+        end
+    end
+end
+
+-- [MODIFIED] ปรับ Priority ให้ทำงานหลังกล้องปกติคำนวณเสร็จ เพื่อให้ล็อคอยู่หมัด
+RunService:BindToRenderStep("AimLockUpdate", Enum.RenderPriority.Camera.Value + 1, updateAimLock)
