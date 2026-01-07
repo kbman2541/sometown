@@ -69,11 +69,18 @@ task.spawn(function()
     end)
 end)
 
--- ====== AIM ASSIST VARIABLES ======
+-- ====== AIM CONFIG (ตั้งค่าการเล็ง) ======
 local aimAssistEnabled = false -- เริ่มต้นปิดไว้ กด Y เพื่อเปิด
 local aimTarget = nil
-local AIM_DISTANCE = 200 -- ปรับระยะเป็น 200 ตามที่ขอ
+local AIM_DISTANCE = 200 
 local ignoredPlayers = {}
+
+-- [NEW] การตั้งค่าเป้าเล็ง (แก้ไขตรงนี้ถ้าเป้าไม่ตรง)
+local AIM_PART = "Head" -- เลือกส่วนที่จะล็อค: "Head" (หัว) หรือ "HumanoidRootPart" (กลางตัว)
+-- ปรับ Offset: Vector3.new(X, Y, Z)
+-- X: ซ้าย/ขวา, Y: ขึ้น/ลง, Z: หน้า/หลัง
+-- ตัวอย่าง: Vector3.new(0, -0.5, 0) จะเล็งต่ำลงมาจากหัวเล็กน้อย
+local AIM_OFFSET = Vector3.new(0, 0, 0) 
 
 -- ====== CROSSHAIR UI ======
 local crosshairFrame = Instance.new("Frame")
@@ -223,16 +230,16 @@ local function getClosestPlayerToCrosshair()
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
 
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AIM_PART) and player.Character:FindFirstChild("HumanoidRootPart") then
             if ignoredPlayers[player] then continue end
 
-            local head = player.Character.Head
+            local targetPart = player.Character[AIM_PART]
             local root = player.Character.HumanoidRootPart
             
             local distanceToPlayer = (root.Position - camera.CFrame.Position).Magnitude
             
             if distanceToPlayer <= maxDistance then
-                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
                 
                 if onScreen then
                     local distanceToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
@@ -431,9 +438,10 @@ end)
 -- Aim Loop
 local function updateAimLock()
     if aimAssistEnabled and aimTarget then
-        if aimTarget.Character and aimTarget.Character:FindFirstChild("Head") and not ignoredPlayers[aimTarget] then
-            -- ใช้ Lerp เล็กน้อยเพื่อให้ดูสมูทขึ้น หรือใช้ lookAt ตรงๆ ก็ได้
-            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, aimTarget.Character.Head.Position)
+        if aimTarget.Character and aimTarget.Character:FindFirstChild(AIM_PART) and not ignoredPlayers[aimTarget] then
+            -- [FIXED] เพิ่ม AIM_OFFSET เข้าไปในตำแหน่ง
+            local targetPos = aimTarget.Character[AIM_PART].Position + AIM_OFFSET
+            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
         else
             aimTarget = nil
             crosshairFrame.BackgroundColor3 = fantasyColors.AimTarget
