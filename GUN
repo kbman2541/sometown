@@ -32,8 +32,18 @@ local fantasyColors = {
     TextGold = Color3.fromRGB(255, 235, 170),
     AimTarget = Color3.fromRGB(255, 50, 50),
     Ignore = Color3.fromRGB(255, 100, 100),
-    AKBBlue = Color3.fromRGB(0, 255, 255) -- สีฟ้าสำหรับ AKB
+    AKBBlue = Color3.fromRGB(0, 255, 255)
 }
+
+-- ====== AIM CONFIG (ตั้งค่าการเล็ง) ======
+local aimAssistEnabled = false
+local aimTarget = nil
+local AIM_DISTANCE = 200 
+local ignoredPlayers = {}
+
+local AIM_PART = "Head" 
+-- ค่าเริ่มต้น (จะถูกทับด้วยค่าจาก Slider)
+local AIM_OFFSET = Vector3.new(0, 0, 0) 
 
 -- ====== INTRO SEQUENCE (AKB) ======
 task.spawn(function()
@@ -49,14 +59,12 @@ task.spawn(function()
     introLabel.TextTransparency = 0
     introLabel.Parent = screenGui
     
-    -- เพิ่ม Stroke ให้ตัวหนังสือชัดขึ้น
     local stroke = Instance.new("UIStroke")
     stroke.Parent = introLabel
     stroke.Thickness = 3
     stroke.Transparency = 0
     
-    -- รอ 3 วินาทีแล้วค่อยๆ จางหายไป
-    task.wait(2) -- แสดงผลเต็มที่ 2 วิ
+    task.wait(2)
     local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local tween = TweenService:Create(introLabel, tweenInfo, {TextTransparency = 1})
     local strokeTween = TweenService:Create(stroke, tweenInfo, {Transparency = 1})
@@ -69,18 +77,96 @@ task.spawn(function()
     end)
 end)
 
--- ====== AIM CONFIG (ตั้งค่าการเล็ง) ======
-local aimAssistEnabled = false -- เริ่มต้นปิดไว้ กด Y เพื่อเปิด
-local aimTarget = nil
-local AIM_DISTANCE = 200 
-local ignoredPlayers = {}
+-- ====== OFFSET ADJUSTER UI (NEW) ======
+local offsetFrame = Instance.new("Frame")
+offsetFrame.Name = "OffsetAdjuster"
+offsetFrame.Size = UDim2.new(0, 200, 0, 160)
+offsetFrame.Position = UDim2.new(0, 10, 1, -170) -- มุมซ้ายล่าง
+offsetFrame.BackgroundColor3 = fantasyColors.Background
+offsetFrame.BorderSizePixel = 0
+offsetFrame.Visible = true
+offsetFrame.Parent = screenGui
+Instance.new("UICorner", offsetFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", offsetFrame).Color = fantasyColors.AKBBlue
 
--- [NEW] การตั้งค่าเป้าเล็ง (แก้ไขตรงนี้ถ้าเป้าไม่ตรง)
-local AIM_PART = "Head" -- เลือกส่วนที่จะล็อค: "Head" (หัว) หรือ "HumanoidRootPart" (กลางตัว)
--- ปรับ Offset: Vector3.new(X, Y, Z)
--- X: ซ้าย/ขวา, Y: ขึ้น/ลง, Z: หน้า/หลัง
--- ตัวอย่าง: Vector3.new(0, -0.5, 0) จะเล็งต่ำลงมาจากหัวเล็กน้อย
-local AIM_OFFSET = Vector3.new(0, 0, 0) 
+local offsetTitle = Instance.new("TextLabel", offsetFrame)
+offsetTitle.Size = UDim2.new(1, 0, 0, 25)
+offsetTitle.BackgroundTransparency = 1
+offsetTitle.Text = "AIM OFFSET ADJUSTER"
+offsetTitle.TextColor3 = fantasyColors.AKBBlue
+offsetTitle.Font = Enum.Font.GothamBold
+offsetTitle.TextSize = 14
+
+-- Function สร้าง Slider
+local function createSlider(name, yPos, axisChar, defaultVal)
+    local label = Instance.new("TextLabel", offsetFrame)
+    label.Size = UDim2.new(1, -10, 0, 15)
+    label.Position = UDim2.new(0, 5, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text = axisChar .. ": " .. defaultVal
+    label.TextColor3 = fantasyColors.Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Code
+    label.TextSize = 12
+
+    local sliderBg = Instance.new("Frame", offsetFrame)
+    sliderBg.Size = UDim2.new(1, -20, 0, 6)
+    sliderBg.Position = UDim2.new(0, 10, 0, yPos + 20)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
+
+    local sliderBtn = Instance.new("TextButton", sliderBg)
+    sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+    sliderBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+    sliderBtn.Position = UDim2.new(0.5, 0, 0.5, 0) -- Start at center (0)
+    sliderBtn.BackgroundColor3 = fantasyColors.AKBBlue
+    sliderBtn.Text = ""
+    Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(1, 0)
+
+    -- Logic การเลื่อน
+    local isDragging = false
+    local minVal, maxVal = -5, 5
+
+    sliderBtn.MouseButton1Down:Connect(function() isDragging = true end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then isDragging = false end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = UserInputService:GetMouseLocation().X
+            local framePos = sliderBg.AbsolutePosition.X
+            local frameSize = sliderBg.AbsoluteSize.X
+            
+            local relativePos = math.clamp((mousePos - framePos) / frameSize, 0, 1)
+            sliderBtn.Position = UDim2.new(relativePos, 0, 0.5, 0)
+            
+            local actualValue = minVal + (relativePos * (maxVal - minVal))
+            actualValue = math.floor(actualValue * 10) / 10 -- ทศนิยม 1 ตำแหน่ง
+            
+            label.Text = axisChar .. ": " .. actualValue
+            
+            -- อัปเดตค่า AIM_OFFSET
+            local currentX = AIM_OFFSET.X
+            local currentY = AIM_OFFSET.Y
+            local currentZ = AIM_OFFSET.Z
+            
+            if axisChar == "X" then currentX = actualValue
+            elseif axisChar == "Y" then currentY = actualValue
+            elseif axisChar == "Z" then currentZ = actualValue end
+            
+            AIM_OFFSET = Vector3.new(currentX, currentY, currentZ)
+        end
+    end)
+    
+    -- Set default position (0 is at 0.5)
+    local startAlpha = (defaultVal - minVal) / (maxVal - minVal)
+    sliderBtn.Position = UDim2.new(startAlpha, 0, 0.5, 0)
+end
+
+createSlider("SliderX", 30, "X", 0)
+createSlider("SliderY", 70, "Y", 0)
+createSlider("SliderZ", 110, "Z", 0)
 
 -- ====== CROSSHAIR UI ======
 local crosshairFrame = Instance.new("Frame")
@@ -94,10 +180,10 @@ crosshairFrame.Visible = false
 crosshairFrame.Parent = screenGui
 Instance.new("UICorner", crosshairFrame).CornerRadius = UDim.new(1, 0)
 
--- [EDITED] ซ่อน Text ตรงกลางจอถาวร (แต่ยังเก็บตัวแปรไว้กัน Error)
+-- ซ่อน Text AimStatus
 local aimStatusLabel = Instance.new("TextLabel")
 aimStatusLabel.Name = "AimStatus"
-aimStatusLabel.Visible = false -- ซ่อนไว้ตลอดเวลา
+aimStatusLabel.Visible = false
 aimStatusLabel.Parent = screenGui
 
 -- ====== PLAYER LIST UI ======
@@ -265,7 +351,6 @@ local function updateFreeCam(deltaTime)
         humanoid.JumpHeight = 0
     end
     
-    -- แก้ไข: ถ้า AimAssist ทำงานอยู่ FreeCam จะไม่หมุนจอด้วยคลิกขวา
     if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not aimAssistEnabled then 
         UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
         local delta = UserInputService:GetMouseDelta()
@@ -327,7 +412,6 @@ local function enableFreeCam()
     if aimAssistEnabled then
         aimAssistEnabled = false
         crosshairFrame.Visible = false
-        -- aimStatusLabel.Visible = false -- ซ่อนถาวรแล้ว
         aimTarget = nil
     end
 
@@ -381,7 +465,6 @@ end
 
 -- ====== INPUT HANDLING ======
 UserInputService.InputBegan:Connect(function(input, processed)
-    -- [MOVED & FIXED] ย้ายมาเช็คก่อน processed เพื่อให้คลิกขวาทำงานได้แม้เกมจะใช้เมาส์อยู่
     if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
         local target = getClosestPlayerToCrosshair()
         if target then
@@ -394,26 +477,27 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
     if processed then return end 
 
-    -- Toggle Aim System (Y)
     if input.KeyCode == Enum.KeyCode.Y then
         aimAssistEnabled = not aimAssistEnabled
         crosshairFrame.Visible = aimAssistEnabled
-        -- aimStatusLabel.Visible = aimAssistEnabled -- ปิดการแสดงผล
         
         if not aimAssistEnabled then
             aimTarget = nil
         end
     end
 
-    -- Toggle Player List (U)
     if input.KeyCode == Enum.KeyCode.U then
         playerListFrame.Visible = not playerListFrame.Visible
         if playerListFrame.Visible then
             refreshPlayerList()
         end
     end
+    
+    -- [NEW] Toggle Offset Menu (O)
+    if input.KeyCode == Enum.KeyCode.O then
+        offsetFrame.Visible = not offsetFrame.Visible
+    end
 
-    -- Toggle Free Cam (Right Shift)
     if input.KeyCode == Enum.KeyCode.RightShift then
         if isFreeCamActive then
             disableFreeCam()
@@ -427,7 +511,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- [EDITED] Handle Button Release (MouseButton2 - คลิกขวา)
 UserInputService.InputEnded:Connect(function(input, processed)
     if aimAssistEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
         aimTarget = nil
@@ -439,7 +522,6 @@ end)
 local function updateAimLock()
     if aimAssistEnabled and aimTarget then
         if aimTarget.Character and aimTarget.Character:FindFirstChild(AIM_PART) and not ignoredPlayers[aimTarget] then
-            -- [FIXED] เพิ่ม AIM_OFFSET เข้าไปในตำแหน่ง
             local targetPos = aimTarget.Character[AIM_PART].Position + AIM_OFFSET
             camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
         else
@@ -449,5 +531,4 @@ local function updateAimLock()
     end
 end
 
--- [MODIFIED] ปรับ Priority ให้ทำงานหลังกล้องปกติคำนวณเสร็จ เพื่อให้ล็อคอยู่หมัด
 RunService:BindToRenderStep("AimLockUpdate", Enum.RenderPriority.Camera.Value + 1, updateAimLock)
