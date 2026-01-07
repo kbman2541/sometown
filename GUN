@@ -45,6 +45,9 @@ local ignoredPlayers = {}
 local AIM_PART = "Head" 
 local AIM_OFFSET = Vector3.new(0, 0, 0) 
 
+-- ====== ESP CONFIG (ตั้งค่า ESP) ======
+local espEnabled = false -- สถานะเปิด/ปิด ESP
+
 -- ====== HELPER FUNCTION: RESOLVE CHARACTER ======
 -- ฟังก์ชันแปลงเป้าหมายให้เป็น Character Model เสมอ (ไม่ว่าจะเป็น Player หรือ Model)
 local function resolveCharacter(target)
@@ -338,6 +341,69 @@ task.spawn(function()
     end
 end)
 
+-- ====== ESP FUNCTION ======
+local function refreshESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = resolveCharacter(player)
+            if char then
+                if espEnabled then
+                    -- 1. สร้าง Highlight (ตัวสีฟ้า)
+                    if not char:FindFirstChild("AKB_Highlight") then
+                        local hl = Instance.new("Highlight")
+                        hl.Name = "AKB_Highlight"
+                        hl.FillColor = fantasyColors.AKBBlue -- สีฟ้า
+                        hl.OutlineColor = Color3.new(1, 1, 1) -- ขอบขาว
+                        hl.FillTransparency = 0.5 -- ความโปร่งแสง
+                        hl.OutlineTransparency = 0
+                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- มองทะลุกำแพง
+                        hl.Parent = char
+                    end
+                    
+                    -- 2. สร้าง NameTag (ชื่อบนหัว)
+                    local head = char:FindFirstChild("Head")
+                    if head and not head:FindFirstChild("AKB_NameTag") then
+                        local bg = Instance.new("BillboardGui")
+                        bg.Name = "AKB_NameTag"
+                        bg.Adornee = head
+                        bg.Size = UDim2.new(0, 200, 0, 50)
+                        bg.StudsOffset = Vector3.new(0, 3.5, 0) -- ลอยเหนือหัว
+                        bg.AlwaysOnTop = true
+                        bg.Parent = head
+                        
+                        local text = Instance.new("TextLabel", bg)
+                        text.Size = UDim2.new(1, 0, 1, 0)
+                        text.BackgroundTransparency = 1
+                        text.Text = player.Name
+                        text.TextColor3 = fantasyColors.AKBBlue -- ชื่อสีฟ้า
+                        text.TextStrokeTransparency = 0
+                        text.Font = Enum.Font.GothamBold
+                        text.TextSize = 14
+                    end
+                else
+                    -- ลบ ESP ถ้าปิดใช้งาน
+                    local hl = char:FindFirstChild("AKB_Highlight")
+                    if hl then hl:Destroy() end
+                    
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        local bg = head:FindFirstChild("AKB_NameTag")
+                        if bg then bg:Destroy() end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Loop ESP (ทำงานตลอดเวลาเพื่อเช็คผู้เล่นใหม่)
+task.spawn(function()
+    while true do
+        refreshESP()
+        task.wait(0.5) -- อัปเดตทุก 0.5 วินาที
+    end
+end)
+
 -- ====== FREE CAM VARIABLES ======
 local camera = Workspace.CurrentCamera
 local isFreeCamActive = false
@@ -572,6 +638,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
             aimTarget = nil
             headMarker.Enabled = false
         end
+    end
+
+    -- Toggle ESP (กด L)
+    if input.KeyCode == Enum.KeyCode.L then
+        espEnabled = not espEnabled
     end
 
     -- Toggle Player List (กด U)
